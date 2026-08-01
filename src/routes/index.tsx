@@ -39,10 +39,30 @@ export const Route = createFileRoute("/")({
   component: AuthPage,
 });
 
+const PRIVACY_NOTICE =
+  "Notice: This system is for authorized Student Assistants (SA) and Human Resources (HR) personnel only. All teacher attendance records are confidential and must be used only for official school purposes. Unauthorized access, sharing, copying, or misuse of any information is strictly prohibited and may result in disciplinary action.";
+
+function PrivacyNotice({ id, checked, onChange }: { id: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/60 p-3">
+      <p className="text-xs leading-relaxed text-muted-foreground">{PRIVACY_NOTICE}</p>
+      <div className="flex items-start gap-2">
+        <Checkbox id={id} checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+        <Label htmlFor={id} className="text-xs font-bold leading-snug">
+          I have read and agree to this Privacy Notice.
+        </Label>
+      </div>
+    </div>
+  );
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { user, role, loading, refresh } = useSession();
   const [busy, setBusy] = useState(false);
+  const [loginAgreed, setLoginAgreed] = useState(false);
+  const [signupAgreed, setSignupAgreed] = useState(false);
+  const [signupRole, setSignupRole] = useState("");
 
   useEffect(() => {
     if (loading || !user) return;
