@@ -194,19 +194,18 @@
   background-color: transparent;
 }
 
-/* Institutional seal watermark behind all content */
+/* Campus banner backdrop behind all content */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("/__l5e/assets-v1/8951c0ef-52c3-4687-8ab3-664b376850bc/dcc-logo.jpg");
+  background-image: url("/__l5e/assets-v1/0ba95edd-c826-44b5-b3fe-17fb55374f79/dcc-campus-bg.jpg");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: min(72vw, 68vh);
-  opacity: 0.1;
-  mix-blend-mode: multiply;
+  background-size: cover;
+  opacity: 0.22;
 }
 
 @media print {
