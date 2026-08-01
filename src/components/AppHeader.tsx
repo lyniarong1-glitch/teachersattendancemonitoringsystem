@@ -16,7 +16,9 @@ export function AppHeader({ name, role }: { name: string; role: string }) {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
           <GraduationCap className="h-6 w-6 text-sidebar-primary" />
-          <span className="font-serif text-lg font-semibold">Faculty Attendance System</span>
+          <span className="font-serif text-lg font-bold uppercase tracking-wide">
+            Teachers Attendance Monitoring System
+          </span>
         </Link>
         <div className="flex items-center gap-3 text-sm">
           <div className="text-right leading-tight">

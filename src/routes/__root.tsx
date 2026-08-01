@@ -78,13 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Faculty Attendance System" },
+      { title: "Teachers Attendance Monitoring System" },
       {
         name: "description",
         content:
           "Campus faculty attendance logging for Student Assistants with HR oversight, editing and reporting.",
       },
-      { property: "og:title", content: "Faculty Attendance System" },
+      { property: "og:title", content: "Teachers Attendance Monitoring System" },
       {
         property: "og:description",
         content: "Student Assistant attendance logging with an HR master table and exports.",

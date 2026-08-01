@@ -21,13 +21,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Faculty Attendance System — Student Assistant & HR Portal" },
+      { title: "Teachers Attendance Monitoring System — SA & HR Portal" },
       {
         name: "description",
         content:
-          "Log faculty attendance by department, room and time as a Student Assistant, and monitor, edit and export the master attendance table as HR.",
+          "Log teachers attendance by department, room and time as a Student Assistant, and monitor, edit and export the master attendance table as HR.",
       },
-      { property: "og:title", content: "Faculty Attendance System" },
+      { property: "og:title", content: "Teachers Attendance Monitoring System" },
       {
         property: "og:description",
         content:
@@ -111,20 +111,20 @@ function AuthPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="campus-bg min-h-screen">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-2 lg:py-20">
         <section className="flex flex-col justify-center">
           <div className="flex items-center gap-2 text-primary">
             <GraduationCap className="h-7 w-7" />
-            <span className="text-sm font-semibold uppercase tracking-[0.2em]">
+            <span className="text-sm font-bold uppercase tracking-[0.2em]">
               Campus Operations
             </span>
           </div>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight text-foreground lg:text-5xl">
-            Faculty Attendance Monitoring System
+          <h1 className="mt-4 text-4xl font-bold uppercase leading-tight text-foreground lg:text-5xl">
+            Teachers Attendance Monitoring System
           </h1>
-          <p className="mt-4 max-w-lg text-muted-foreground">
-            Student Assistants record faculty presence per department, room and schedule. HR
+          <p className="mt-4 max-w-lg font-semibold text-muted-foreground">
+            Student Assistants record teachers' presence per department, room and schedule. HR
             reviews, corrects and exports the master attendance table — all from one shared record.
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">

@@ -189,7 +189,7 @@ function SAModule() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" />
       <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-3">
         <Card className="lg:col-span-2">

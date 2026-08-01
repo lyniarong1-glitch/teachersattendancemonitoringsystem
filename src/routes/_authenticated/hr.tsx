@@ -184,7 +184,7 @@ function HRModule() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Human Resources" />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
         <Card>
