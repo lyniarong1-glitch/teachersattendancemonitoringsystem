@@ -170,7 +170,8 @@ function AuthPage() {
                     <Label htmlFor="login-password">Password</Label>
                     <PasswordInput id="login-password" name="password" required />
                   </div>
-                  <Button type="submit" className="w-full" disabled={busy}>
+                  <PrivacyNotice id="login-agree" checked={loginAgreed} onChange={setLoginAgreed} />
+                  <Button type="submit" className="w-full" disabled={busy || !loginAgreed}>
                     {busy ? "Please wait…" : "Log In"}
                   </Button>
                 </form>
