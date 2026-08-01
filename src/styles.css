@@ -63,7 +63,7 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.985 0.006 106);
+  --background: oklch(0.895 0.035 148);
   --foreground: oklch(0.24 0.03 155);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.24 0.03 155);
@@ -149,14 +149,49 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-body);
+    font-weight: 500;
+    /* Education-themed backdrop: ruled notebook lines + graph grid on sage green */
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--primary) 9%, transparent) 0 1px,
+        transparent 1px 32px
+      ),
+      repeating-linear-gradient(
+        to right,
+        color-mix(in oklab, var(--primary) 5%, transparent) 0 1px,
+        transparent 1px 32px
+      ),
+      radial-gradient(
+        circle at 15% 10%,
+        color-mix(in oklab, var(--accent) 16%, transparent),
+        transparent 45%
+      );
+    background-attachment: fixed;
   }
 
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: -0.015em;
   }
+
+  label,
+  th {
+    font-weight: 700;
+  }
+
+  p,
+  li,
+  td {
+    font-weight: 500;
+  }
+}
+
+@utility campus-bg {
+  background-color: transparent;
 }
 
 @media print {
@@ -166,6 +201,7 @@
 
   body {
     background: white;
+    background-image: none;
   }
 }
 
