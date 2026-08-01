@@ -112,6 +112,7 @@ function AuthPage() {
       address: String(form.get("address")).trim() || null,
       email,
       username: String(form.get("username")).trim(),
+      id_number: String(form.get("id_number") ?? "").trim() || null,
     };
 
     const [{ error: profileError }, { error: roleError }] = await Promise.all([
