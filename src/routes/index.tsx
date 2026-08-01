@@ -188,7 +188,7 @@ function AuthPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="role">Role</Label>
-                      <Select name="role">
+                      <Select name="role" value={signupRole} onValueChange={setSignupRole}>
                         <SelectTrigger id="role">
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
@@ -199,6 +199,12 @@ function AuthPage() {
                       </Select>
                     </div>
                   </div>
+                  {signupRole === "student_assistant" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="id_number">Student Assistant ID Number</Label>
+                      <Input id="id_number" name="id_number" required maxLength={40} />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
                     <Textarea id="address" name="address" rows={2} maxLength={300} />
