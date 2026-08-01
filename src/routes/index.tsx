@@ -222,7 +222,8 @@ function AuthPage() {
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={busy}>
+                  <PrivacyNotice id="signup-agree" checked={signupAgreed} onChange={setSignupAgreed} />
+                  <Button type="submit" className="w-full" disabled={busy || !signupAgreed}>
                     {busy ? "Creating account…" : "Create Account"}
                   </Button>
                 </form>
