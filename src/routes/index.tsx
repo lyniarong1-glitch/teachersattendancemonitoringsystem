@@ -9,6 +9,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -39,10 +40,30 @@ export const Route = createFileRoute("/")({
   component: AuthPage,
 });
 
+const PRIVACY_NOTICE =
+  "Notice: This system is for authorized Student Assistants (SA) and Human Resources (HR) personnel only. All teacher attendance records are confidential and must be used only for official school purposes. Unauthorized access, sharing, copying, or misuse of any information is strictly prohibited and may result in disciplinary action.";
+
+function PrivacyNotice({ id, checked, onChange }: { id: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/60 p-3">
+      <p className="text-xs leading-relaxed text-muted-foreground">{PRIVACY_NOTICE}</p>
+      <div className="flex items-start gap-2">
+        <Checkbox id={id} checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+        <Label htmlFor={id} className="text-xs font-bold leading-snug">
+          I have read and agree to this Privacy Notice.
+        </Label>
+      </div>
+    </div>
+  );
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { user, role, loading, refresh } = useSession();
   const [busy, setBusy] = useState(false);
+  const [loginAgreed, setLoginAgreed] = useState(false);
+  const [signupAgreed, setSignupAgreed] = useState(false);
+  const [signupRole, setSignupRole] = useState("");
 
   useEffect(() => {
     if (loading || !user) return;
@@ -91,6 +112,7 @@ function AuthPage() {
       address: String(form.get("address")).trim() || null,
       email,
       username: String(form.get("username")).trim(),
+      id_number: String(form.get("id_number") ?? "").trim() || null,
     };
 
     const [{ error: profileError }, { error: roleError }] = await Promise.all([
@@ -148,7 +170,8 @@ function AuthPage() {
                     <Label htmlFor="login-password">Password</Label>
                     <PasswordInput id="login-password" name="password" required />
                   </div>
-                  <Button type="submit" className="w-full" disabled={busy}>
+                  <PrivacyNotice id="login-agree" checked={loginAgreed} onChange={setLoginAgreed} />
+                  <Button type="submit" className="w-full" disabled={busy || !loginAgreed}>
                     {busy ? "Please wait…" : "Log In"}
                   </Button>
                 </form>
@@ -167,7 +190,7 @@ function AuthPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="role">Role</Label>
-                      <Select name="role">
+                      <Select name="role" value={signupRole} onValueChange={setSignupRole}>
                         <SelectTrigger id="role">
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
@@ -178,6 +201,12 @@ function AuthPage() {
                       </Select>
                     </div>
                   </div>
+                  {signupRole === "student_assistant" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="id_number">Student Assistant ID Number</Label>
+                      <Input id="id_number" name="id_number" required maxLength={40} />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
                     <Textarea id="address" name="address" rows={2} maxLength={300} />
@@ -201,7 +230,8 @@ function AuthPage() {
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={busy}>
+                  <PrivacyNotice id="signup-agree" checked={signupAgreed} onChange={setSignupAgreed} />
+                  <Button type="submit" className="w-full" disabled={busy || !signupAgreed}>
                     {busy ? "Creating account…" : "Create Account"}
                   </Button>
                 </form>
