@@ -194,6 +194,21 @@
   background-color: transparent;
 }
 
+/* Institutional seal watermark behind all content */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("/__l5e/assets-v1/8951c0ef-52c3-4687-8ab3-664b376850bc/dcc-logo.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: min(72vw, 68vh);
+  opacity: 0.1;
+  mix-blend-mode: multiply;
+}
+
 @media print {
   .no-print {
     display: none !important;
