@@ -123,30 +123,6 @@ function AuthPage() {
           <h1 className="mt-4 text-4xl font-bold uppercase leading-tight text-foreground lg:text-5xl">
             Teachers Attendance Monitoring System
           </h1>
-          <p className="mt-4 max-w-lg font-semibold text-muted-foreground">
-            Student Assistants record teachers' presence per department, room and schedule. HR
-            reviews, corrects and exports the master attendance table — all from one shared record.
-          </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <Card className="border-border/70">
-              <CardHeader className="pb-2">
-                <ClipboardCheck className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Student Assistant</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                Select department and teacher, log room, arrival, departure, status and remarks.
-              </CardContent>
-            </Card>
-            <Card className="border-border/70">
-              <CardHeader className="pb-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Human Resources</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                Search, filter, edit with audit trail, and export to Excel, PDF or print.
-              </CardContent>
-            </Card>
-          </div>
         </section>
 
         <Card className="self-center shadow-lg">
