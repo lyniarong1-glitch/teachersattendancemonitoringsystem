@@ -22,19 +22,19 @@ export function formatTime(value?: string | null) {
 }
 
 export const ROOMS = [
-  "A-201", "A-202", "A-203", "A-204", "A-205", "A-206",
-  "B-101", "B-102", "B-103", "B-104", "B-105",
-  "C-201", "C-202", "C-203", "C-204",
-  "D-301", "D-302", "D-303", "D-304",
-  "E-101", "E-102", "E-103",
-  "F-201", "F-202", "F-203",
-  "G-301", "G-302",
-  "HME Function Hall", "HME Kitchen Lab", "HME Bar Lab", "HME Hotel Room Lab",
-  "ITE Computer Lab 1", "ITE Computer Lab 2", "ITE Computer Lab 3",
-  "CRIM Crime Lab", "CRIM Moot Court",
-  "Speech Laboratory", "Science Laboratory", "Library Annex",
-  "Gymnasium", "AVR Hall",
-  "SA-405", "SA-406",
+  "A-201", "A-202",
+  "F-102", "F-103", "F-301", "F-302", "F-303",
+  "Mini Hotel",
+  "Chemistry Laboratory",
+  "Biological Science Laboratory",
+  "Upper Canteen A", "Upper Canteen B",
+  "Cold Kitchen", "Hot Kitchen 1", "Hot Kitchen 2",
+  "SA-105",
+  "SA-201", "SA-202", "SA-203", "SA-204", "SA-205",
+  "SA-206", "SA-207", "SA-208", "SA-209", "SA-210",
+  "SA-301", "SA-302", "SA-303", "SA-304", "SA-305", "SA-306",
+  "SA-307", "SA-308", "SA-309", "SA-310", "SA-311",
+  "SA-401", "SA-402", "SA-403", "SA-404", "SA-405", "SA-406",
 ];
 
 export const REMARKS_OPTIONS = [
@@ -43,7 +43,7 @@ export const REMARKS_OPTIONS = [
   "Seminar",
   "No Class",
   "Class Rescheduled",
-  "Other",
+  "Others",
 ];
 
 export const STATUS_OPTIONS = ["Present", "Late", "Absent"] as const;
