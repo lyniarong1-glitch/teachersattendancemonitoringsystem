@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { GraduationCap, ClipboardCheck, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
+import dccSeal from "@/assets/dcc-seal.jpg.asset.json";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Input } from "@/components/ui/input";
@@ -13,12 +13,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,6 +73,24 @@ function AuthPage() {
   const [loginAgreed, setLoginAgreed] = useState(false);
   const [signupAgreed, setSignupAgreed] = useState(false);
   const [signupRole, setSignupRole] = useState("");
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function handleForgot(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSending(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSending(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password reset link sent — check your email.");
+      setForgotOpen(false);
+    }
+  }
+
 
   useEffect(() => {
     if (loading || !user) return;
@@ -136,17 +163,17 @@ function AuthPage() {
   return (
     <main className="campus-bg min-h-screen">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-2 lg:py-20">
-        <section className="flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-primary">
-            <GraduationCap className="h-7 w-7" />
-            <span className="text-sm font-bold uppercase tracking-[0.2em]">
-              Campus Operations
-            </span>
-          </div>
+        <section className="flex flex-col items-center justify-center text-center lg:items-start lg:text-left">
+          <img
+            src={dccSeal.url}
+            alt="Davao Central College official seal"
+            className="h-28 w-28 rounded-full bg-card/80 object-contain p-1 shadow-md lg:h-36 lg:w-36"
+          />
           <h1 className="mt-4 text-4xl font-bold uppercase leading-tight text-foreground lg:text-5xl">
             Teachers Attendance Monitoring System
           </h1>
         </section>
+
 
         <Card className="self-center shadow-lg">
           <CardHeader>
@@ -169,11 +196,19 @@ function AuthPage() {
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
                     <PasswordInput id="login-password" name="password" required />
+                    <button
+                      type="button"
+                      onClick={() => setForgotOpen(true)}
+                      className="text-xs font-bold text-primary underline-offset-2 hover:underline"
+                    >
+                      Forgot password?
+                    </button>
                   </div>
                   <PrivacyNotice id="login-agree" checked={loginAgreed} onChange={setLoginAgreed} />
                   <Button type="submit" className="w-full" disabled={busy || !loginAgreed}>
                     {busy ? "Please wait…" : "Log In"}
                   </Button>
+
                 </form>
               </TabsContent>
 
@@ -240,6 +275,35 @@ function AuthPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              Enter your registered email. We'll send a verification link to set a new password.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleForgot}>
+            <div className="space-y-2">
+              <Label htmlFor="forgot-email">Email</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="w-full" disabled={sending}>
+                {sending ? "Sending…" : "Send reset link"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </main>
+
   );
 }
