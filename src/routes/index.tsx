@@ -73,6 +73,24 @@ function AuthPage() {
   const [loginAgreed, setLoginAgreed] = useState(false);
   const [signupAgreed, setSignupAgreed] = useState(false);
   const [signupRole, setSignupRole] = useState("");
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function handleForgot(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSending(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSending(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password reset link sent — check your email.");
+      setForgotOpen(false);
+    }
+  }
+
 
   useEffect(() => {
     if (loading || !user) return;
