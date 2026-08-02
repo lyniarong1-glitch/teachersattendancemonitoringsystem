@@ -178,11 +178,19 @@ function AuthPage() {
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
                     <PasswordInput id="login-password" name="password" required />
+                    <button
+                      type="button"
+                      onClick={() => setForgotOpen(true)}
+                      className="text-xs font-bold text-primary underline-offset-2 hover:underline"
+                    >
+                      Forgot password?
+                    </button>
                   </div>
                   <PrivacyNotice id="login-agree" checked={loginAgreed} onChange={setLoginAgreed} />
                   <Button type="submit" className="w-full" disabled={busy || !loginAgreed}>
                     {busy ? "Please wait…" : "Log In"}
                   </Button>
+
                 </form>
               </TabsContent>
 
