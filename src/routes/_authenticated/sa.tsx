@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/sa")({
       {
         name: "description",
         content:
-          "Select a department and teacher, then log room assignment, arrival and departure times, attendance status and remarks.",
+          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet.",
       },
       { property: "og:title", content: "Student Assistant Attendance Entry" },
       {
@@ -45,20 +46,7 @@ export const Route = createFileRoute("/_authenticated/sa")({
   component: SAModule,
 });
 
-type Confirmation = {
-  teacher: string;
-  department: string;
-  room: string;
-  arrival: string;
-  out: string;
-  status: string;
-  remarks: string;
-  stamp: string;
-};
-
-type FormState = {
-  department_id: string;
-  teacher_id: string;
+type RowState = {
   room_assignment: string;
   time_arrival: string;
   time_out: string;
@@ -67,9 +55,7 @@ type FormState = {
   other_remark: string;
 };
 
-const EMPTY: FormState = {
-  department_id: "",
-  teacher_id: "",
+const EMPTY_ROW: RowState = {
   room_assignment: "",
   time_arrival: "",
   time_out: "",
@@ -81,10 +67,11 @@ const EMPTY: FormState = {
 function SAModule() {
   const { user, role, fullName } = useSession();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<FormState>(EMPTY);
-  const [confirmed, setConfirmed] = useState<Confirmation | null>(null);
+  const [departmentId, setDepartmentId] = useState("");
+  const [rows, setRows] = useState<Record<string, RowState>>({});
 
-  const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
+  const setRow = (id: string, patch: Partial<RowState>) =>
+    setRows((r) => ({ ...r, [id]: { ...EMPTY_ROW, ...r[id], ...patch } }));
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -96,13 +83,13 @@ function SAModule() {
   });
 
   const { data: teachers = [] } = useQuery({
-    queryKey: ["teachers", form.department_id],
-    enabled: !!form.department_id,
+    queryKey: ["teachers", departmentId],
+    enabled: !!departmentId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teachers")
         .select("id, full_name")
-        .eq("department_id", form.department_id)
+        .eq("department_id", departmentId)
         .order("full_name");
       if (error) throw error;
       return data;
@@ -125,57 +112,46 @@ function SAModule() {
     },
   });
 
-  const departmentName = useMemo(
-    () => departments.find((d) => d.id === form.department_id)?.name ?? "",
-    [departments, form.department_id],
-  );
-  const teacherName = useMemo(
-    () => teachers.find((t) => t.id === form.teacher_id)?.full_name ?? "",
-    [teachers, form.teacher_id],
+  const readyRows = useMemo(
+    () =>
+      teachers.filter((t) => {
+        const r = rows[t.id];
+        if (!r) return false;
+        if (!r.room_assignment || !r.attendance_status) return false;
+        if (r.attendance_status !== "Absent" && (!r.time_arrival || !r.time_out)) return false;
+        return true;
+      }),
+    [teachers, rows],
   );
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
-      const remarks =
-        form.remarks === "Other" ? form.other_remark.trim() || "Other" : form.remarks;
-      const { error } = await supabase.from("attendance_records").insert({
-        teacher_id: form.teacher_id,
-        department_id: form.department_id,
-        submitted_by: user.id,
-        room_assignment: form.room_assignment,
-        time_arrival: form.time_arrival || null,
-        time_out: form.time_out || null,
-        attendance_status: form.attendance_status as "Present" | "Late" | "Absent",
-        remarks,
+      const payload = readyRows.map((t) => {
+        const r = rows[t.id]!;
+        return {
+          teacher_id: t.id,
+          department_id: departmentId,
+          submitted_by: user.id,
+          room_assignment: r.room_assignment,
+          time_arrival: r.time_arrival || null,
+          time_out: r.time_out || null,
+          attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
+          remarks:
+            r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
+        };
       });
+      const { error } = await supabase.from("attendance_records").insert(payload);
       if (error) throw error;
-      return remarks;
+      return payload.length;
     },
-    onSuccess: (remarks) => {
-      setConfirmed({
-        teacher: teacherName,
-        department: departmentName,
-        room: form.room_assignment,
-        arrival: formatTime(form.time_arrival),
-        out: formatTime(form.time_out),
-        status: form.attendance_status,
-        remarks,
-        stamp: new Date().toLocaleString(),
-      });
-      setForm(EMPTY);
+    onSuccess: (count) => {
+      setRows({});
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      toast.success("Attendance record submitted");
+      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const canSubmit =
-    form.department_id &&
-    form.teacher_id &&
-    form.room_assignment &&
-    form.attendance_status &&
-    (form.attendance_status === "Absent" || (form.time_arrival && form.time_out));
 
   if (role && role !== "student_assistant") {
     return (
@@ -191,197 +167,193 @@ function SAModule() {
   return (
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" />
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        <Card>
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Your account ID and an exact timestamp are attached automatically on submit.
+              Pick a department, fill in the rows you observed, then submit. Your account ID and an
+              exact timestamp are attached automatically.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Department">
-                <Select
-                  value={form.department_id}
-                  onValueChange={(v) => set({ department_id: v, teacher_id: "" })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                  <SelectContent>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Teacher">
-                <Select
-                  value={form.teacher_id}
-                  onValueChange={(v) => set({ teacher_id: v })}
-                  disabled={!form.department_id}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select teacher" /></SelectTrigger>
-                  <SelectContent>
-                    {teachers.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <Field label="Room Assignment">
+            <div className="max-w-xs space-y-2">
+              <Label>Department</Label>
               <Select
-                value={form.room_assignment}
-                onValueChange={(v) => set({ room_assignment: v })}
+                value={departmentId}
+                onValueChange={(v) => {
+                  setDepartmentId(v);
+                  setRows({});
+                }}
               >
-                <SelectTrigger><SelectValue placeholder="Select room" /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {ROOMS.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Time of Arrival">
-                <Select value={form.time_arrival} onValueChange={(v) => set({ time_arrival: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select time" /></SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {TIME_SLOTS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Time Out">
-                <Select value={form.time_out} onValueChange={(v) => set({ time_out: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select time" /></SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {TIME_SLOTS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Attendance Status">
-                <Select
-                  value={form.attendance_status}
-                  onValueChange={(v) => set({ attendance_status: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Remarks">
-                <Select value={form.remarks} onValueChange={(v) => set({ remarks: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select remark" /></SelectTrigger>
-                  <SelectContent>
-                    {REMARKS_OPTIONS.map((r) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            {form.remarks === "Other" && (
-              <Field label="Specify Remark">
-                <Input
-                  value={form.other_remark}
-                  maxLength={200}
-                  onChange={(e) => set({ other_remark: e.target.value })}
-                  placeholder="Describe the remark"
-                />
-              </Field>
+            {departmentId && (
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full min-w-[1000px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-secondary/60">
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Teacher's Name
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Room Assigned
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Time In
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Time Out
+                      </th>
+                      <th colSpan={3} className="border border-border px-3 py-2 text-center">
+                        Attendance Status
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Remarks
+                      </th>
+                    </tr>
+                    <tr className="bg-secondary/60">
+                      {STATUS_OPTIONS.map((s) => (
+                        <th key={s} className="border border-border px-3 py-1 text-center w-12">
+                          {s[0]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teachers.map((t) => {
+                      const r = rows[t.id] ?? EMPTY_ROW;
+                      return (
+                        <tr key={t.id} className="align-top">
+                          <td className="border border-border px-3 py-2 font-medium">
+                            {t.full_name}
+                          </td>
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.room_assignment}
+                              onValueChange={(v) => setRow(t.id, { room_assignment: v })}
+                            >
+                              <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                {ROOMS.map((room) => (
+                                  <SelectItem key={room} value={room}>{room}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.time_arrival}
+                              onValueChange={(v) => setRow(t.id, { time_arrival: v })}
+                            >
+                              <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                {TIME_SLOTS.map((s) => (
+                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.time_out}
+                              onValueChange={(v) => setRow(t.id, { time_out: v })}
+                            >
+                              <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                {TIME_SLOTS.map((s) => (
+                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {STATUS_OPTIONS.map((s) => (
+                            <td key={s} className="border border-border p-1 text-center">
+                              <Checkbox
+                                aria-label={`${s} — ${t.full_name}`}
+                                checked={r.attendance_status === s}
+                                onCheckedChange={(c) =>
+                                  setRow(t.id, { attendance_status: c ? s : "" })
+                                }
+                              />
+                            </td>
+                          ))}
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.remarks}
+                              onValueChange={(v) => setRow(t.id, { remarks: v })}
+                            >
+                              <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
+                              <SelectContent>
+                                {REMARKS_OPTIONS.map((o) => (
+                                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {r.remarks === "Others" && (
+                              <Input
+                                className="mt-1 h-9 w-44"
+                                maxLength={200}
+                                value={r.other_remark}
+                                onChange={(e) => setRow(t.id, { other_remark: e.target.value })}
+                                placeholder="Specify remark"
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             <Button
-              className="w-full"
-              disabled={!canSubmit || submit.isPending}
+              className="w-full sm:w-auto"
+              disabled={readyRows.length === 0 || submit.isPending}
               onClick={() => submit.mutate()}
             >
               <Send className="mr-2 h-4 w-4" />
-              {submit.isPending ? "Submitting…" : "Submit Record"}
+              {submit.isPending
+                ? "Submitting…"
+                : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
             </Button>
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          {confirmed && (
-            <Card className="border-primary/40 bg-secondary/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CheckCircle2 className="h-5 w-5 text-primary" /> Submission Confirmed
-                </CardTitle>
-                <CardDescription>Saved to the HR master table.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <Row k="Teacher" v={confirmed.teacher} />
-                <Row k="Department" v={confirmed.department} />
-                <Row k="Room" v={confirmed.room} />
-                <Row k="Time In" v={confirmed.arrival} />
-                <Row k="Time Out" v={confirmed.out} />
-                <Row k="Status" v={confirmed.status} />
-                <Row k="Remarks" v={confirmed.remarks} />
-                <Row k="Timestamp" v={confirmed.stamp} />
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">My Recent Submissions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {mine.length === 0 && (
-                <p className="text-sm text-muted-foreground">No records submitted yet.</p>
-              )}
-              {mine.map((r) => (
-                <div key={r.id} className="rounded-md border border-border p-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{r.teachers?.full_name}</span>
-                    <Badge variant="secondary">{r.attendance_status}</Badge>
-                  </div>
-                  <div className="mt-1 text-muted-foreground">
-                    {r.departments?.name} · {r.room_assignment} · {formatTime(r.time_arrival)} –{" "}
-                    {formatTime(r.time_out)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
-                  </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">My Recent Submissions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {mine.length === 0 && (
+              <p className="text-sm text-muted-foreground">No records submitted yet.</p>
+            )}
+            {mine.map((r) => (
+              <div key={r.id} className="rounded-md border border-border p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{r.teachers?.full_name}</span>
+                  <Badge variant="secondary">{r.attendance_status}</Badge>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+                <div className="mt-1 text-muted-foreground">
+                  {r.departments?.name} · {r.room_assignment} · {formatTime(r.time_arrival)} –{" "}
+                  {formatTime(r.time_out)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </main>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="text-right font-medium">{v}</span>
     </div>
   );
 }
