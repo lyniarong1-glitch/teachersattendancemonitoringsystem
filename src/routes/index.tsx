@@ -145,17 +145,17 @@ function AuthPage() {
   return (
     <main className="campus-bg min-h-screen">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-2 lg:py-20">
-        <section className="flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-primary">
-            <GraduationCap className="h-7 w-7" />
-            <span className="text-sm font-bold uppercase tracking-[0.2em]">
-              Campus Operations
-            </span>
-          </div>
+        <section className="flex flex-col items-center justify-center text-center lg:items-start lg:text-left">
+          <img
+            src={dccSeal.url}
+            alt="Davao Central College official seal"
+            className="h-28 w-28 rounded-full bg-card/80 object-contain p-1 shadow-md lg:h-36 lg:w-36"
+          />
           <h1 className="mt-4 text-4xl font-bold uppercase leading-tight text-foreground lg:text-5xl">
             Teachers Attendance Monitoring System
           </h1>
         </section>
+
 
         <Card className="self-center shadow-lg">
           <CardHeader>
