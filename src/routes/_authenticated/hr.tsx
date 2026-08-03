@@ -119,6 +119,20 @@ function HRModule() {
     );
   }, [records, department, search]);
 
+  const teacherRecords = useMemo(() => {
+    if (!teacherView) return [];
+    return records
+      .filter((r) => r.teacher_id === teacherView.id)
+      .sort(
+        (a, b) =>
+          `${b.date_submitted} ${b.time_submitted}`.localeCompare(
+            `${a.date_submitted} ${a.time_submitted}`,
+          ),
+      );
+  }, [records, teacherView]);
+
+
+
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
       if (!user) throw new Error("Not signed in");
