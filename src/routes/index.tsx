@@ -302,31 +302,57 @@ function AuthPage() {
         </Card>
       </div>
 
-      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+      <Dialog open={forgotOpen} onOpenChange={closeForgot}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset your password</DialogTitle>
+            <DialogTitle>Forgot Password?</DialogTitle>
             <DialogDescription>
-              Enter your registered email. We'll send a verification link to set a new password.
+              Enter your registered email address to reset your password.
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleForgot}>
-            <div className="space-y-2">
-              <Label htmlFor="forgot-email">Email</Label>
-              <Input
-                id="forgot-email"
-                type="email"
-                required
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit" className="w-full" disabled={sending}>
-                {sending ? "Sending…" : "Send reset link"}
+
+          {forgotSent ? (
+            <div className="space-y-4">
+              <p className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm font-bold text-foreground">
+                Password reset link sent! Please check your email.
+              </p>
+              <Button variant="outline" className="w-full" onClick={() => closeForgot(false)}>
+                Back to Login
               </Button>
-            </DialogFooter>
-          </form>
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleForgot} noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email Address</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={forgotEmail}
+                  onChange={(e) => {
+                    setForgotEmail(e.target.value);
+                    setForgotError("");
+                  }}
+                />
+                {forgotError && (
+                  <p className="text-sm font-bold text-destructive">{forgotError}</p>
+                )}
+              </div>
+              <DialogFooter className="flex-col gap-2 sm:flex-col">
+                <Button type="submit" className="w-full" disabled={sending}>
+                  {sending ? "Sending…" : "Send Reset Link"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => closeForgot(false)}
+                >
+                  Back to Login
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </main>
