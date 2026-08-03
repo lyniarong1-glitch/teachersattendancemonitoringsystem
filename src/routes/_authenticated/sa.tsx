@@ -166,6 +166,23 @@ function SAModule() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const navigate = useNavigate();
+  const removeAccount = useMutation({
+    mutationFn: async () => {
+      await deleteMyAccount();
+    },
+    onSuccess: async () => {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await supabase.auth.signOut();
+      toast.success("Your account has been deleted");
+      void navigate({ to: "/", replace: true });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
+
   if (role && role !== "student_assistant") {
     return (
       <div className="min-h-screen">
