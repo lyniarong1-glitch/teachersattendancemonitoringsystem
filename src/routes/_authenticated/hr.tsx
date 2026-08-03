@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Printer, Search, Pencil } from "lucide-react";
+import { ArrowLeft, Download, FileText, Printer, Search, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -84,6 +84,8 @@ function HRModule() {
   const [department, setDepartment] = useState("all");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<RecordRow | null>(null);
+  const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -116,6 +118,20 @@ function HRModule() {
         (!q || (r.teachers?.full_name ?? "").toLowerCase().includes(q)),
     );
   }, [records, department, search]);
+
+  const teacherRecords = useMemo(() => {
+    if (!teacherView) return [];
+    return records
+      .filter((r) => r.teacher_id === teacherView.id)
+      .sort(
+        (a, b) =>
+          `${b.date_submitted} ${b.time_submitted}`.localeCompare(
+            `${a.date_submitted} ${a.time_submitted}`,
+          ),
+      );
+  }, [records, teacherView]);
+
+
 
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
@@ -269,7 +285,21 @@ function HRModule() {
                   )}
                   {filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.teachers?.full_name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                          onClick={() =>
+                            setTeacherView({
+                              id: r.teacher_id,
+                              name: r.teachers?.full_name ?? "Teacher",
+                            })
+                          }
+                        >
+                          {r.teachers?.full_name}
+                        </button>
+                      </TableCell>
+
                       <TableCell>{r.departments?.name}</TableCell>
                       <TableCell>{r.room_assignment}</TableCell>
                       <TableCell>{formatTime(r.time_arrival)}</TableCell>
@@ -311,6 +341,89 @@ function HRModule() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={!!teacherView} onOpenChange={(o) => !o && setTeacherView(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{teacherView?.name} — Attendance History</DialogTitle>
+            <DialogDescription>
+              {teacherRecords.length} record{teacherRecords.length === 1 ? "" : "s"}, most recent
+              first.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto rounded-md border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time Submitted</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Room</TableHead>
+                  <TableHead>Time In</TableHead>
+                  <TableHead>Time Out</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Remarks</TableHead>
+                  <TableHead>Submitted By</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teacherRecords.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
+                      No records for this teacher yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {teacherRecords.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{r.date_submitted}</TableCell>
+                    <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
+                    <TableCell>{r.departments?.name}</TableCell>
+                    <TableCell>{r.room_assignment}</TableCell>
+                    <TableCell>{formatTime(r.time_arrival)}</TableCell>
+                    <TableCell>{formatTime(r.time_out)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          r.attendance_status === "Present"
+                            ? "default"
+                            : r.attendance_status === "Late"
+                              ? "secondary"
+                              : "destructive"
+                        }
+                      >
+                        {r.attendance_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {r.remarks || "None"}
+                      {r.last_edited_at && (
+                        <div className="text-xs text-muted-foreground">
+                          edited {new Date(r.last_edited_at).toLocaleString()}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                        <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTeacherView(null)}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
