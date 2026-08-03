@@ -269,7 +269,21 @@ function HRModule() {
                   )}
                   {filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.teachers?.full_name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                          onClick={() =>
+                            setTeacherView({
+                              id: r.teacher_id,
+                              name: r.teachers?.full_name ?? "Teacher",
+                            })
+                          }
+                        >
+                          {r.teachers?.full_name}
+                        </button>
+                      </TableCell>
+
                       <TableCell>{r.departments?.name}</TableCell>
                       <TableCell>{r.room_assignment}</TableCell>
                       <TableCell>{formatTime(r.time_arrival)}</TableCell>
