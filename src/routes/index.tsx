@@ -75,20 +75,46 @@ function AuthPage() {
   const [signupRole, setSignupRole] = useState("");
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
   const [sending, setSending] = useState(false);
+
+  function closeForgot(open: boolean) {
+    setForgotOpen(open);
+    if (!open) {
+      setForgotError("");
+      setForgotSent(false);
+      setForgotEmail("");
+    }
+  }
 
   async function handleForgot(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const email = forgotEmail.trim();
+    setForgotError("");
+    if (!email) {
+      setForgotError("Please enter your email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setForgotError("Please enter a valid email address.");
+      return;
+    }
     setSending(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setSending(false);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Password reset link sent — check your email.");
-      setForgotOpen(false);
+    if (error) {
+      setForgotError(
+        /not found|invalid|user/i.test(error.message)
+          ? "This email is not registered in the system."
+          : error.message,
+      );
+      return;
     }
+    setForgotSent(true);
+    toast.success("Password reset link sent! Please check your email.");
   }
 
 
