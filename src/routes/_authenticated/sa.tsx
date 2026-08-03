@@ -331,29 +331,96 @@ function SAModule() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">My Recent Submissions</CardTitle>
+            <CardDescription>Most recent submissions first.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {mine.length === 0 && (
-              <p className="text-sm text-muted-foreground">No records submitted yet.</p>
-            )}
-            {mine.map((r) => (
-              <div key={r.id} className="rounded-md border border-border p-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{r.teachers?.full_name}</span>
-                  <Badge variant="secondary">{r.attendance_status}</Badge>
-                </div>
-                <div className="mt-1 text-muted-foreground">
-                  {r.departments?.name} · {r.room_assignment} · {formatTime(r.time_arrival)} –{" "}
-                  {formatTime(r.time_out)}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
-                </div>
-              </div>
-            ))}
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full min-w-[900px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-secondary/60">
+                    <th className="border border-border px-3 py-2 text-left">Date Submitted</th>
+                    <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
+                    <th className="border border-border px-3 py-2 text-left">Department</th>
+                    <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
+                    <th className="border border-border px-3 py-2 text-left">Time In</th>
+                    <th className="border border-border px-3 py-2 text-left">Time Out</th>
+                    <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
+                    <th className="border border-border px-3 py-2 text-left">Remarks</th>
+                    <th className="border border-border px-3 py-2 text-left">Submitted By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mine.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="border border-border px-3 py-6 text-center text-muted-foreground"
+                      >
+                        No records submitted yet.
+                      </td>
+                    </tr>
+                  )}
+                  {mine.map((r) => (
+                    <tr key={r.id}>
+                      <td className="border border-border px-3 py-2">
+                        {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
+                      </td>
+                      <td className="border border-border px-3 py-2 font-medium">
+                        {r.teachers?.full_name}
+                      </td>
+                      <td className="border border-border px-3 py-2">{r.departments?.name}</td>
+                      <td className="border border-border px-3 py-2">{r.room_assignment}</td>
+                      <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
+                      <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
+                      <td className="border border-border px-3 py-2">
+                        <Badge variant="secondary">{r.attendance_status}</Badge>
+                      </td>
+                      <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
+                      <td className="border border-border px-3 py-2">{fullName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-destructive">Delete My Account</CardTitle>
+            <CardDescription>
+              Resigning? Deleting your account permanently removes your sign-in access to this
+              system. Attendance records you submitted stay in the HR master table.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={removeAccount.isPending}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {removeAccount.isPending ? "Deleting…" : "Delete Account"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This cannot be undone. You will be signed out immediately and will no longer be
+                    able to access the Teachers Attendance Monitoring System.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => removeAccount.mutate()}>
+                    Yes, delete my account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </main>
     </div>
   );
 }
+
