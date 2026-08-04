@@ -3,7 +3,16 @@ import { GraduationCap, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
-export function AppHeader({ name, role }: { name: string; role: string }) {
+export function AppHeader({
+  name,
+  role,
+  idNumber,
+}: {
+  name: string;
+  role: string;
+  idNumber?: string;
+}) {
+
   const navigate = useNavigate();
 
   async function signOut() {
