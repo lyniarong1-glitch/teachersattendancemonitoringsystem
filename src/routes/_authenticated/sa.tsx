@@ -406,7 +406,13 @@ function SAModule() {
                         <Badge variant="secondary">{r.attendance_status}</Badge>
                       </td>
                       <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
-                      <td className="border border-border px-3 py-2">{fullName}</td>
+                      <td className="border border-border px-3 py-2">
+                        {fullName}
+                        {idNumber && (
+                          <div className="text-xs text-muted-foreground">ID No. {idNumber}</div>
+                        )}
+                      </td>
+
                     </tr>
                   ))}
                 </tbody>
