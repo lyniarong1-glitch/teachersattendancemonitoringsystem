@@ -338,7 +338,20 @@ function HRModule() {
                       </TableCell>
                       <TableCell>{r.date_submitted}</TableCell>
                       <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
-                      <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                      <TableCell>
+                        {r.profiles ? (
+                          <button
+                            type="button"
+                            onClick={() => setSaView(r.profiles)}
+                            className="font-bold text-primary underline-offset-2 hover:underline"
+                          >
+                            {r.profiles.full_name}
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+
                       <TableCell className="no-print">
                         <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                           <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
