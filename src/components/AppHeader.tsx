@@ -32,8 +32,12 @@ export function AppHeader({
         <div className="flex items-center gap-3 text-sm">
           <div className="text-right leading-tight">
             <div className="font-medium">{name}</div>
+            {idNumber && (
+              <div className="text-sidebar-foreground/70">ID No. {idNumber}</div>
+            )}
             <div className="text-sidebar-foreground/70">{role}</div>
           </div>
+
           <Button size="sm" variant="secondary" onClick={signOut}>
             <LogOut className="mr-1 h-4 w-4" /> Sign out
           </Button>
