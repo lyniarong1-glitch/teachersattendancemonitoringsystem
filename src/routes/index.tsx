@@ -75,46 +75,20 @@ function AuthPage() {
   const [signupRole, setSignupRole] = useState("");
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotError, setForgotError] = useState("");
-  const [forgotSent, setForgotSent] = useState(false);
   const [sending, setSending] = useState(false);
-
-  function closeForgot(open: boolean) {
-    setForgotOpen(open);
-    if (!open) {
-      setForgotError("");
-      setForgotSent(false);
-      setForgotEmail("");
-    }
-  }
 
   async function handleForgot(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const email = forgotEmail.trim();
-    setForgotError("");
-    if (!email) {
-      setForgotError("Please enter your email address.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setForgotError("Please enter a valid email address.");
-      return;
-    }
     setSending(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setSending(false);
-    if (error) {
-      setForgotError(
-        /not found|invalid|user/i.test(error.message)
-          ? "This email is not registered in the system."
-          : error.message,
-      );
-      return;
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password reset link sent — check your email.");
+      setForgotOpen(false);
     }
-    setForgotSent(true);
-    toast.success("Password reset link sent! Please check your email.");
   }
 
 
@@ -302,57 +276,31 @@ function AuthPage() {
         </Card>
       </div>
 
-      <Dialog open={forgotOpen} onOpenChange={closeForgot}>
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Forgot Password?</DialogTitle>
+            <DialogTitle>Reset your password</DialogTitle>
             <DialogDescription>
-              Enter your registered email address to reset your password.
+              Enter your registered email. We'll send a verification link to set a new password.
             </DialogDescription>
           </DialogHeader>
-
-          {forgotSent ? (
-            <div className="space-y-4">
-              <p className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm font-bold text-foreground">
-                Password reset link sent! Please check your email.
-              </p>
-              <Button variant="outline" className="w-full" onClick={() => closeForgot(false)}>
-                Back to Login
-              </Button>
+          <form className="space-y-4" onSubmit={handleForgot}>
+            <div className="space-y-2">
+              <Label htmlFor="forgot-email">Email</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+              />
             </div>
-          ) : (
-            <form className="space-y-4" onSubmit={handleForgot} noValidate>
-              <div className="space-y-2">
-                <Label htmlFor="forgot-email">Email Address</Label>
-                <Input
-                  id="forgot-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={forgotEmail}
-                  onChange={(e) => {
-                    setForgotEmail(e.target.value);
-                    setForgotError("");
-                  }}
-                />
-                {forgotError && (
-                  <p className="text-sm font-bold text-destructive">{forgotError}</p>
-                )}
-              </div>
-              <DialogFooter className="flex-col gap-2 sm:flex-col">
-                <Button type="submit" className="w-full" disabled={sending}>
-                  {sending ? "Sending…" : "Send Reset Link"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => closeForgot(false)}
-                >
-                  Back to Login
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
+            <DialogFooter>
+              <Button type="submit" className="w-full" disabled={sending}>
+                {sending ? "Sending…" : "Send reset link"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </main>
