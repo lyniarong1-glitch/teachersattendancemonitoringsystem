@@ -94,6 +94,8 @@ function HRModule() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<RecordRow | null>(null);
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
+  const [saView, setSaView] = useState<RecordRow["profiles"] | null>(null);
+
 
 
   const { data: departments = [] } = useQuery({
