@@ -3,6 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
+import { resolveLoginEmail } from "@/lib/auth.functions";
+
 import dccSeal from "@/assets/dcc-seal.jpg.asset.json";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/PasswordInput";
