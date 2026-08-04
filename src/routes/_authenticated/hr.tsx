@@ -113,7 +113,7 @@ function HRModule() {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(id, full_name, birthdate, email, address, id_number)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
