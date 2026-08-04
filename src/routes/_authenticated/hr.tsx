@@ -75,8 +75,17 @@ type RecordRow = {
   department_id: string;
   teachers: { full_name: string } | null;
   departments: { name: string } | null;
-  profiles: { full_name: string } | null;
+  submitted_by: string | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    birthdate: string | null;
+    email: string;
+    address: string | null;
+    id_number: string | null;
+  } | null;
 };
+
 
 function HRModule() {
   const { user, role, fullName } = useSession();
@@ -85,6 +94,8 @@ function HRModule() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<RecordRow | null>(null);
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
+  const [saView, setSaView] = useState<RecordRow["profiles"] | null>(null);
+
 
 
   const { data: departments = [] } = useQuery({
@@ -102,7 +113,7 @@ function HRModule() {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(id, full_name, birthdate, email, address, id_number)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -327,7 +338,20 @@ function HRModule() {
                       </TableCell>
                       <TableCell>{r.date_submitted}</TableCell>
                       <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
-                      <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                      <TableCell>
+                        {r.profiles ? (
+                          <button
+                            type="button"
+                            onClick={() => setSaView(r.profiles)}
+                            className="font-bold text-primary underline-offset-2 hover:underline"
+                          >
+                            {r.profiles.full_name}
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+
                       <TableCell className="no-print">
                         <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                           <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
@@ -341,6 +365,50 @@ function HRModule() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={!!saView} onOpenChange={(o) => !o && setSaView(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Student Assistant Information</DialogTitle>
+            <DialogDescription>Personal details of the submitting account.</DialogDescription>
+          </DialogHeader>
+          {saView && (
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground">Full Name</dt>
+                <dd className="font-bold">{saView.full_name}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">ID Number</dt>
+                <dd className="font-bold">{saView.id_number || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Date of Birth</dt>
+                <dd className="font-bold">{saView.birthdate || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Role</dt>
+                <dd className="font-bold">Student Assistant</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Email Address</dt>
+                <dd className="font-bold break-all">{saView.email}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-muted-foreground">Address</dt>
+                <dd className="font-bold">{saView.address || "—"}</dd>
+              </div>
+            </dl>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaView(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
 
       <Dialog open={!!teacherView} onOpenChange={(o) => !o && setTeacherView(null)}>
         <DialogContent className="max-w-5xl">
@@ -404,7 +472,20 @@ function HRModule() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                    <TableCell>
+                      {r.profiles ? (
+                        <button
+                          type="button"
+                          onClick={() => setSaView(r.profiles)}
+                          className="font-bold text-primary underline-offset-2 hover:underline"
+                        >
+                          {r.profiles.full_name}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                         <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
