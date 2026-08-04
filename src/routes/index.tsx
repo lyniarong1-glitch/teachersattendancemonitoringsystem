@@ -128,14 +128,23 @@ function AuthPage() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(form.get("email")).trim(),
-      password: String(form.get("password")),
-    });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Signed in");
+    try {
+      const { email } = await resolveLoginEmail({
+        data: { identifier: String(form.get("identifier")).trim() },
+      });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: String(form.get("password")),
+      });
+      if (error) throw new Error("Incorrect username or password.");
+      toast.success("Signed in");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setBusy(false);
+    }
   }
+
 
   async function handleSignUp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
