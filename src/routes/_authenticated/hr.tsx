@@ -366,6 +366,50 @@ function HRModule() {
         </Card>
       </main>
 
+      <Dialog open={!!saView} onOpenChange={(o) => !o && setSaView(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Student Assistant Information</DialogTitle>
+            <DialogDescription>Personal details of the submitting account.</DialogDescription>
+          </DialogHeader>
+          {saView && (
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground">Full Name</dt>
+                <dd className="font-bold">{saView.full_name}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">ID Number</dt>
+                <dd className="font-bold">{saView.id_number || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Date of Birth</dt>
+                <dd className="font-bold">{saView.birthdate || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Role</dt>
+                <dd className="font-bold">Student Assistant</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Email Address</dt>
+                <dd className="font-bold break-all">{saView.email}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-muted-foreground">Address</dt>
+                <dd className="font-bold">{saView.address || "—"}</dd>
+              </div>
+            </dl>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaView(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+
       <Dialog open={!!teacherView} onOpenChange={(o) => !o && setTeacherView(null)}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
