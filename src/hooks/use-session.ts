@@ -54,6 +54,6 @@ export function useSession() {
     };
   }, [hydrate]);
 
-  return { user, role, fullName, loading, refresh };
+  return { user, role, fullName, idNumber, loading, refresh };
 }
 
