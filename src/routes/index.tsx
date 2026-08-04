@@ -3,6 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
+import { resolveLoginEmail } from "@/lib/auth.functions";
+
 import dccSeal from "@/assets/dcc-seal.jpg.asset.json";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/PasswordInput";
@@ -90,32 +92,32 @@ function AuthPage() {
 
   async function handleForgot(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const email = forgotEmail.trim();
+    const identifier = forgotEmail.trim();
     setForgotError("");
-    if (!email) {
-      setForgotError("Please enter your email address.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setForgotError("Please enter a valid email address.");
+    if (!identifier) {
+      setForgotError("Please enter your registered email address or username.");
       return;
     }
     setSending(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setSending(false);
-    if (error) {
+    try {
+      const { email } = await resolveLoginEmail({ data: { identifier } });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw new Error(error.message);
+      setForgotSent(true);
+      toast.success("Password reset link sent! Please check your email.");
+    } catch (err) {
       setForgotError(
-        /not found|invalid|user/i.test(error.message)
-          ? "This email is not registered in the system."
-          : error.message,
+        err instanceof Error && err.message
+          ? err.message
+          : "This account is not registered in the system.",
       );
-      return;
+    } finally {
+      setSending(false);
     }
-    setForgotSent(true);
-    toast.success("Password reset link sent! Please check your email.");
   }
+
 
 
   useEffect(() => {
@@ -128,14 +130,23 @@ function AuthPage() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(form.get("email")).trim(),
-      password: String(form.get("password")),
-    });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Signed in");
+    try {
+      const { email } = await resolveLoginEmail({
+        data: { identifier: String(form.get("identifier")).trim() },
+      });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: String(form.get("password")),
+      });
+      if (error) throw new Error("Incorrect username or password.");
+      toast.success("Signed in");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setBusy(false);
+    }
   }
+
 
   async function handleSignUp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -216,9 +227,16 @@ function AuthPage() {
               <TabsContent value="login">
                 <form className="space-y-4 pt-4" onSubmit={handleLogin}>
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" name="email" type="email" required />
+                    <Label htmlFor="login-identifier">Username</Label>
+                    <Input
+                      id="login-identifier"
+                      name="identifier"
+                      autoComplete="username"
+                      placeholder="Your username (or email)"
+                      required
+                    />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
                     <PasswordInput id="login-password" name="password" required />
@@ -307,8 +325,10 @@ function AuthPage() {
           <DialogHeader>
             <DialogTitle>Forgot Password?</DialogTitle>
             <DialogDescription>
-              Enter your registered email address to reset your password.
+              Enter your registered email address or username. We will email you a verification
+              link so you can create a new password.
             </DialogDescription>
+
           </DialogHeader>
 
           {forgotSent ? (
@@ -323,13 +343,14 @@ function AuthPage() {
           ) : (
             <form className="space-y-4" onSubmit={handleForgot} noValidate>
               <div className="space-y-2">
-                <Label htmlFor="forgot-email">Email Address</Label>
+                <Label htmlFor="forgot-email">Email Address or Username</Label>
                 <Input
                   id="forgot-email"
-                  type="email"
-                  placeholder="name@example.com"
+                  type="text"
+                  placeholder="name@example.com or username"
                   value={forgotEmail}
                   onChange={(e) => {
+
                     setForgotEmail(e.target.value);
                     setForgotError("");
                   }}
