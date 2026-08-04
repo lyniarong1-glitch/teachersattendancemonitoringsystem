@@ -78,7 +78,7 @@ const EMPTY_ROW: RowState = {
 };
 
 function SAModule() {
-  const { user, role, fullName } = useSession();
+  const { user, role, fullName, idNumber } = useSession();
   const queryClient = useQueryClient();
   const [departmentId, setDepartmentId] = useState("");
   const [rows, setRows] = useState<Record<string, RowState>>({});
@@ -196,7 +196,7 @@ function SAModule() {
 
   return (
     <div className="min-h-screen campus-bg">
-      <AppHeader name={fullName} role="Student Assistant" />
+      <AppHeader name={fullName} role="Student Assistant" idNumber={idNumber} />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
         <Card>
           <CardHeader>
