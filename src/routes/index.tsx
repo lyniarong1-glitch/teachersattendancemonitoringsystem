@@ -325,8 +325,10 @@ function AuthPage() {
           <DialogHeader>
             <DialogTitle>Forgot Password?</DialogTitle>
             <DialogDescription>
-              Enter your registered email address to reset your password.
+              Enter your registered email address or username. We will email you a verification
+              link so you can create a new password.
             </DialogDescription>
+
           </DialogHeader>
 
           {forgotSent ? (
