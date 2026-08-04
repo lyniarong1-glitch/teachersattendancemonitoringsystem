@@ -75,8 +75,17 @@ type RecordRow = {
   department_id: string;
   teachers: { full_name: string } | null;
   departments: { name: string } | null;
-  profiles: { full_name: string } | null;
+  submitted_by: string | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    birthdate: string | null;
+    email: string;
+    address: string | null;
+    id_number: string | null;
+  } | null;
 };
+
 
 function HRModule() {
   const { user, role, fullName } = useSession();
