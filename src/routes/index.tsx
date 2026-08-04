@@ -227,9 +227,16 @@ function AuthPage() {
               <TabsContent value="login">
                 <form className="space-y-4 pt-4" onSubmit={handleLogin}>
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" name="email" type="email" required />
+                    <Label htmlFor="login-identifier">Username</Label>
+                    <Input
+                      id="login-identifier"
+                      name="identifier"
+                      autoComplete="username"
+                      placeholder="Your username (or email)"
+                      required
+                    />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
                     <PasswordInput id="login-password" name="password" required />
