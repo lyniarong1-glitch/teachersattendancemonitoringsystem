@@ -343,13 +343,14 @@ function AuthPage() {
           ) : (
             <form className="space-y-4" onSubmit={handleForgot} noValidate>
               <div className="space-y-2">
-                <Label htmlFor="forgot-email">Email Address</Label>
+                <Label htmlFor="forgot-email">Email Address or Username</Label>
                 <Input
                   id="forgot-email"
-                  type="email"
-                  placeholder="name@example.com"
+                  type="text"
+                  placeholder="name@example.com or username"
                   value={forgotEmail}
                   onChange={(e) => {
+
                     setForgotEmail(e.target.value);
                     setForgotError("");
                   }}
