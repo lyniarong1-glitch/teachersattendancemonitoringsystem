@@ -428,7 +428,20 @@ function HRModule() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                    <TableCell>
+                      {r.profiles ? (
+                        <button
+                          type="button"
+                          onClick={() => setSaView(r.profiles)}
+                          className="font-bold text-primary underline-offset-2 hover:underline"
+                        >
+                          {r.profiles.full_name}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                         <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
