@@ -8,7 +8,6 @@ export function useSession() {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [fullName, setFullName] = useState<string>("");
-  const [idNumber, setIdNumber] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const activeRef = useRef(true);
 
@@ -18,21 +17,18 @@ export function useSession() {
     if (!nextUser) {
       setRole(null);
       setFullName("");
-      setIdNumber("");
       setLoading(false);
       return;
     }
     const [{ data: roleRow }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", nextUser.id).maybeSingle(),
-      supabase.from("profiles").select("full_name, id_number").eq("id", nextUser.id).maybeSingle(),
+      supabase.from("profiles").select("full_name").eq("id", nextUser.id).maybeSingle(),
     ]);
     if (!activeRef.current) return;
     setRole((roleRow?.role as AppRole) ?? null);
     setFullName(profile?.full_name ?? nextUser.email ?? "");
-    setIdNumber(profile?.id_number ?? "");
     setLoading(false);
   }, []);
-
 
   const refresh = useCallback(async () => {
     const { data } = await supabase.auth.getUser();
@@ -54,6 +50,6 @@ export function useSession() {
     };
   }, [hydrate]);
 
-  return { user, role, fullName, idNumber, loading, refresh };
+  return { user, role, fullName, loading, refresh };
 }
 
