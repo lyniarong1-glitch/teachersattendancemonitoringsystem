@@ -47,3 +47,9 @@ export const REMARKS_OPTIONS = [
 ];
 
 export const STATUS_OPTIONS = ["Present", "Late", "Absent"] as const;
+
+export const CLASS_SCHEDULES: string[] = [
+  "Morning Session",
+  "Afternoon Session",
+  "Evening Session",
+];
