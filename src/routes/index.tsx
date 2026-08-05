@@ -132,14 +132,17 @@ function AuthPage() {
       return;
     }
 
+    const isSA = selectedRole === "student_assistant";
     const profile = {
       id: data.user.id,
       full_name: String(form.get("full_name")).trim(),
       birthdate: String(form.get("birthdate")) || null,
       address: String(form.get("address")).trim() || null,
       email,
-      username: String(form.get("username")).trim(),
       id_number: String(form.get("id_number") ?? "").trim() || null,
+      course_year: isSA ? String(form.get("course_year") ?? "").trim() || null : null,
+      class_schedule: isSA ? signupSchedule || null : null,
+      mobile_number: isSA ? String(form.get("mobile_number") ?? "").trim() || null : null,
     };
 
     const [{ error: profileError }, { error: roleError }] = await Promise.all([
