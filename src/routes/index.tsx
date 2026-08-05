@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CLASS_SCHEDULES } from "@/lib/attendance-constants";
 
 
 export const Route = createFileRoute("/")({
