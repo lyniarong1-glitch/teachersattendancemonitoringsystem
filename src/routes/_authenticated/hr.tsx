@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, FileText, Printer, Search, Pencil } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  Pencil,
+  Printer,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -10,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -49,7 +59,7 @@ export const Route = createFileRoute("/_authenticated/hr")({
       {
         name: "description",
         content:
-          "Monitor every faculty attendance entry, filter by department or teacher, correct records with audit timestamps, and export to Excel, PDF or print.",
+          "Monitor every faculty attendance entry grouped by date, filter by department or teacher, correct records with audit timestamps, and export to Excel, PDF or print.",
       },
       { property: "og:title", content: "HR Master Attendance Table" },
       {
@@ -73,10 +83,17 @@ type RecordRow = {
   last_edited_at: string | null;
   teacher_id: string;
   department_id: string;
+  submitted_by: string | null;
   teachers: { full_name: string } | null;
   departments: { name: string } | null;
   profiles: { full_name: string } | null;
 };
+
+const DATES_PER_PAGE = 3;
+
+function statusVariant(s: RecordRow["attendance_status"]) {
+  return s === "Present" ? "default" : s === "Late" ? "secondary" : "destructive";
+}
 
 function HRModule() {
   const { user, role, fullName } = useSession();
@@ -85,7 +102,8 @@ function HRModule() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<RecordRow | null>(null);
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
-
+  const [saView, setSaView] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -102,11 +120,25 @@ function HRModule() {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as unknown as RecordRow[];
+    },
+  });
+
+  const { data: saProfile } = useQuery({
+    queryKey: ["sa-profile", saView],
+    enabled: !!saView,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", saView!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -119,19 +151,30 @@ function HRModule() {
     );
   }, [records, department, search]);
 
+  const groups = useMemo(() => {
+    const map = new Map<string, RecordRow[]>();
+    for (const r of filtered) {
+      const list = map.get(r.date_submitted);
+      if (list) list.push(r);
+      else map.set(r.date_submitted, [r]);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filtered]);
+
+  const pageCount = Math.max(1, Math.ceil(groups.length / DATES_PER_PAGE));
+  const safePage = Math.min(page, pageCount - 1);
+  const visibleGroups = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+
   const teacherRecords = useMemo(() => {
     if (!teacherView) return [];
     return records
       .filter((r) => r.teacher_id === teacherView.id)
-      .sort(
-        (a, b) =>
-          `${b.date_submitted} ${b.time_submitted}`.localeCompare(
-            `${a.date_submitted} ${a.time_submitted}`,
-          ),
+      .sort((a, b) =>
+        `${b.date_submitted} ${b.time_submitted}`.localeCompare(
+          `${a.date_submitted} ${a.time_submitted}`,
+        ),
       );
   }, [records, teacherView]);
-
-
 
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
@@ -158,12 +201,12 @@ function HRModule() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function exportCsv() {
+  function exportCsv(date: string, rows: RecordRow[]) {
     const header = [
       "Teacher Name", "Department", "Room", "Time In", "Time Out", "Status",
-      "Remarks", "Date Submitted", "Time Submitted", "Submitted By", "Last Edited",
+      "Remarks", "Time Submitted", "Submitted By", "Last Edited",
     ];
-    const rows = filtered.map((r) => [
+    const body = rows.map((r) => [
       r.teachers?.full_name ?? "",
       r.departments?.name ?? "",
       r.room_assignment,
@@ -171,27 +214,26 @@ function HRModule() {
       formatTime(r.time_out),
       r.attendance_status,
       r.remarks ?? "",
-      r.date_submitted,
       formatTime(r.time_submitted?.slice(0, 5)),
       r.profiles?.full_name ?? "",
       r.last_edited_at ? new Date(r.last_edited_at).toLocaleString() : "",
     ]);
-    const csv = [header, ...rows]
+    const csv = [header, ...body]
       .map((line) => line.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `attendance-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `attendance-${date}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Excel (CSV) report downloaded");
+    toast.success(`Excel report for ${date} downloaded`);
   }
 
   if (role && role !== "hr") {
     return (
       <div className="min-h-screen">
-        <AppHeader name={fullName} role="Student Assistant" />
+        <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
         <div className="mx-auto max-w-2xl p-8 text-center text-muted-foreground">
           This module is only available to HR accounts.
         </div>
@@ -201,33 +243,27 @@ function HRModule() {
 
   return (
     <div className="min-h-screen campus-bg">
-      <AppHeader name={fullName} role="Human Resources" />
+      <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
         <Card>
-          <CardHeader className="no-print flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <CardTitle>Master Attendance Table</CardTitle>
-              <CardDescription>
-                {filtered.length} record{filtered.length === 1 ? "" : "s"} shown
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={exportCsv}>
-                <Download className="mr-2 h-4 w-4" /> Export Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => window.print()}>
-                <FileText className="mr-2 h-4 w-4" /> Export PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => window.print()}>
-                <Printer className="mr-2 h-4 w-4" /> Print
-              </Button>
-            </div>
+          <CardHeader className="no-print">
+            <CardTitle>Master Attendance Table</CardTitle>
+            <CardDescription>
+              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length} date
+              section{groups.length === 1 ? "" : "s"}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div className="no-print grid gap-4 sm:grid-cols-2 lg:max-w-xl">
               <div className="space-y-2">
                 <Label>Department</Label>
-                <Select value={department} onValueChange={setDepartment}>
+                <Select
+                  value={department}
+                  onValueChange={(v) => {
+                    setDepartment(v);
+                    setPage(0);
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Departments</SelectItem>
@@ -238,106 +274,147 @@ function HRModule() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Teacher Name</Label>
+                <Label>Teachers Name</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     className="pl-9"
                     placeholder="Search teacher…"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(0);
+                    }}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-md border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Teacher Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Room</TableHead>
-                    <TableHead>Time In</TableHead>
-                    <TableHead>Time Out</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Remarks</TableHead>
-                    <TableHead>Date Submitted</TableHead>
-                    <TableHead>Time Submitted</TableHead>
-                    <TableHead>Submitted By (SA)</TableHead>
-                    <TableHead className="no-print">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && (
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground">
-                        Loading records…
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {!isLoading && filtered.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground">
-                        No attendance records match the current filters.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        <button
-                          type="button"
-                          className="text-left font-semibold text-primary underline underline-offset-2 hover:opacity-80"
-                          onClick={() =>
-                            setTeacherView({
-                              id: r.teacher_id,
-                              name: r.teachers?.full_name ?? "Teacher",
-                            })
-                          }
-                        >
-                          {r.teachers?.full_name}
-                        </button>
-                      </TableCell>
+            {isLoading && <p className="text-muted-foreground">Loading records…</p>}
+            {!isLoading && groups.length === 0 && (
+              <p className="text-muted-foreground">
+                No attendance records match the current filters.
+              </p>
+            )}
 
-                      <TableCell>{r.departments?.name}</TableCell>
-                      <TableCell>{r.room_assignment}</TableCell>
-                      <TableCell>{formatTime(r.time_arrival)}</TableCell>
-                      <TableCell>{formatTime(r.time_out)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            r.attendance_status === "Present"
-                              ? "default"
-                              : r.attendance_status === "Late"
-                                ? "secondary"
-                                : "destructive"
-                          }
-                        >
-                          {r.attendance_status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {r.remarks || "None"}
-                        {r.last_edited_at && (
-                          <div className="text-xs text-muted-foreground">
-                            edited {new Date(r.last_edited_at).toLocaleString()}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>{r.date_submitted}</TableCell>
-                      <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
-                      <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
-                      <TableCell className="no-print">
-                        <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
-                          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            {visibleGroups.map(([date, rows]) => (
+              <section key={date} className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
+                    Date Submitted: {date}
+                  </div>
+                  <div className="no-print flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => exportCsv(date, rows)}>
+                      <Download className="mr-2 h-4 w-4" /> Export Excel
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                      <FileText className="mr-2 h-4 w-4" /> Export PDF
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                      <Printer className="mr-2 h-4 w-4" /> Print
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Teachers Name</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Room</TableHead>
+                        <TableHead>Time In &amp; Time Out</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Remarks</TableHead>
+                        <TableHead>Time Submitted</TableHead>
+                        <TableHead>Submitted By</TableHead>
+                        <TableHead className="no-print">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell>
+                            <button
+                              type="button"
+                              className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
+                              onClick={() =>
+                                setTeacherView({
+                                  id: r.teacher_id,
+                                  name: r.teachers?.full_name ?? "Teacher",
+                                })
+                              }
+                            >
+                              {r.teachers?.full_name}
+                            </button>
+                          </TableCell>
+                          <TableCell>{r.departments?.name}</TableCell>
+                          <TableCell>{r.room_assignment}</TableCell>
+                          <TableCell>
+                            {formatTime(r.time_arrival)} – {formatTime(r.time_out)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusVariant(r.attendance_status)}>
+                              {r.attendance_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {r.remarks || "None"}
+                            {r.last_edited_at && (
+                              <div className="text-xs text-muted-foreground">
+                                edited {new Date(r.last_edited_at).toLocaleString()}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
+                          <TableCell>
+                            {r.submitted_by ? (
+                              <button
+                                type="button"
+                                className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
+                                onClick={() => setSaView(r.submitted_by)}
+                              >
+                                {r.profiles?.full_name ?? "Student Assistant"}
+                              </button>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="no-print">
+                            <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                              <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+            ))}
+
+            {groups.length > 0 && (
+              <div className="no-print flex items-center justify-between gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage === 0}
+                  onClick={() => setPage(safePage - 1)}
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" /> Previous Page
+                </Button>
+                <span className="text-sm font-bold">
+                  Page {safePage + 1} of {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage >= pageCount - 1}
+                  onClick={() => setPage(safePage + 1)}
+                >
+                  Next Page <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
@@ -384,15 +461,7 @@ function HRModule() {
                     <TableCell>{formatTime(r.time_arrival)}</TableCell>
                     <TableCell>{formatTime(r.time_out)}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          r.attendance_status === "Present"
-                            ? "default"
-                            : r.attendance_status === "Late"
-                              ? "secondary"
-                              : "destructive"
-                        }
-                      >
+                      <Badge variant={statusVariant(r.attendance_status)}>
                         {r.attendance_status}
                       </Badge>
                     </TableCell>
@@ -423,7 +492,35 @@ function HRModule() {
         </DialogContent>
       </Dialog>
 
-
+      <Dialog open={!!saView} onOpenChange={(o) => !o && setSaView(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Student Assistant Details</DialogTitle>
+            <DialogDescription>Contact and enrollment information on file.</DialogDescription>
+          </DialogHeader>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            {[
+              ["Full Name", saProfile?.full_name],
+              ["Date of Birth", saProfile?.birthdate],
+              ["Course & Year", saProfile?.course_year],
+              ["Class Schedule", saProfile?.class_schedule],
+              ["Student ID Number", saProfile?.id_number],
+              ["Active Mobile Number", saProfile?.mobile_number],
+              ["Email Address", saProfile?.email],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <dt className="text-xs uppercase text-muted-foreground">{label}</dt>
+                <dd className="font-bold">{(value as string) || "—"}</dd>
+              </div>
+            ))}
+          </dl>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaView(null)}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
@@ -480,44 +577,47 @@ function HRModule() {
                   </Select>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={editing.attendance_status}
-                    onValueChange={(v) =>
-                      setEditing({
-                        ...editing,
-                        attendance_status: v as RecordRow["attendance_status"],
-                      })
-                    }
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-2">
+                <Label>Attendance Status</Label>
+                <div className="flex flex-wrap items-center gap-5 rounded-md border border-border p-3">
+                  {STATUS_OPTIONS.map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm font-bold">
+                      <Checkbox
+                        checked={editing.attendance_status === s}
+                        onCheckedChange={(c) =>
+                          setEditing({
+                            ...editing,
+                            attendance_status: (c
+                              ? s
+                              : editing.attendance_status) as RecordRow["attendance_status"],
+                          })
+                        }
+                      />
+                      {s}
+                    </label>
+                  ))}
                 </div>
-                <div className="space-y-2">
-                  <Label>Remarks</Label>
-                  <Select
-                    value={
-                      REMARKS_OPTIONS.includes(editing.remarks ?? "None")
-                        ? (editing.remarks ?? "None")
-                        : "Other"
-                    }
-                    onValueChange={(v) => setEditing({ ...editing, remarks: v })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {REMARKS_OPTIONS.map((r) => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tick a different status to undo an accidental selection before saving.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Remarks</Label>
+                <Select
+                  value={
+                    REMARKS_OPTIONS.includes(editing.remarks ?? "None")
+                      ? (editing.remarks ?? "None")
+                      : "Others"
+                  }
+                  onValueChange={(v) => setEditing({ ...editing, remarks: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {REMARKS_OPTIONS.map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
@@ -525,10 +625,7 @@ function HRModule() {
             <Button variant="outline" onClick={() => setEditing(null)}>
               Cancel
             </Button>
-            <Button
-              disabled={update.isPending}
-              onClick={() => editing && update.mutate(editing)}
-            >
+            <Button disabled={update.isPending} onClick={() => editing && update.mutate(editing)}>
               {update.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>

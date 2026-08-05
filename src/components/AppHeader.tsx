@@ -1,10 +1,23 @@
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { GraduationCap, LogOut } from "lucide-react";
+import { GraduationCap, LogOut, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { AccountDialog } from "@/components/AccountDialog";
 
-export function AppHeader({ name, role }: { name: string; role: string }) {
+export function AppHeader({
+  name,
+  role,
+  userId,
+  isSA,
+}: {
+  name: string;
+  role: string;
+  userId?: string | undefined;
+  isSA?: boolean;
+}) {
   const navigate = useNavigate();
+  const [accountOpen, setAccountOpen] = useState(false);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -21,15 +34,29 @@ export function AppHeader({ name, role }: { name: string; role: string }) {
           </span>
         </Link>
         <div className="flex items-center gap-3 text-sm">
-          <div className="text-right leading-tight">
-            <div className="font-medium">{name}</div>
-            <div className="text-sidebar-foreground/70">{role}</div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setAccountOpen(true)}
+            className="flex items-center gap-2 rounded-md px-2 py-1 text-right leading-tight hover:bg-sidebar-accent/40"
+            title="Settings & Privacy"
+          >
+            <Settings className="h-4 w-4 opacity-70" />
+            <span>
+              <span className="block font-bold underline underline-offset-2">{name}</span>
+              <span className="block text-sidebar-foreground/70">{role}</span>
+            </span>
+          </button>
           <Button size="sm" variant="secondary" onClick={signOut}>
             <LogOut className="mr-1 h-4 w-4" /> Sign out
           </Button>
         </div>
       </div>
+      <AccountDialog
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        userId={userId}
+        isSA={!!isSA}
+      />
     </header>
   );
 }

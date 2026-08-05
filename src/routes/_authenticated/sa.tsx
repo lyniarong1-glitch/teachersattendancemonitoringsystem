@@ -196,7 +196,7 @@ function SAModule() {
 
   return (
     <div className="min-h-screen campus-bg">
-      <AppHeader name={fullName} role="Student Assistant" />
+      <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
         <Card>
           <CardHeader>
@@ -247,6 +247,9 @@ function SAModule() {
                       </th>
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Remarks
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-center">
+                        Undo
                       </th>
                     </tr>
                     <tr className="bg-secondary/60">
@@ -336,6 +339,23 @@ function SAModule() {
                                 placeholder="Specify remark"
                               />
                             )}
+                          </td>
+                          <td className="border border-border p-1 text-center">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              type="button"
+                              disabled={!rows[t.id]}
+                              onClick={() =>
+                                setRows((prev) => {
+                                  const next = { ...prev };
+                                  delete next[t.id];
+                                  return next;
+                                })
+                              }
+                            >
+                              Clear
+                            </Button>
                           </td>
                         </tr>
                       );

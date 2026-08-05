@@ -106,32 +106,38 @@ export type Database = {
         Row: {
           address: string | null
           birthdate: string | null
+          class_schedule: string | null
+          course_year: string | null
           created_at: string
           email: string
           full_name: string
           id: string
           id_number: string | null
-          username: string
+          mobile_number: string | null
         }
         Insert: {
           address?: string | null
           birthdate?: string | null
+          class_schedule?: string | null
+          course_year?: string | null
           created_at?: string
           email: string
           full_name: string
           id: string
           id_number?: string | null
-          username: string
+          mobile_number?: string | null
         }
         Update: {
           address?: string | null
           birthdate?: string | null
+          class_schedule?: string | null
+          course_year?: string | null
           created_at?: string
           email?: string
           full_name?: string
           id?: string
           id_number?: string | null
-          username?: string
+          mobile_number?: string | null
         }
         Relationships: []
       }
