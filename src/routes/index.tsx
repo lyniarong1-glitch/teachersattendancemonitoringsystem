@@ -241,24 +241,57 @@ function AuthPage() {
                     </div>
                   </div>
                   {signupRole === "student_assistant" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="id_number">Student Assistant ID Number</Label>
-                      <Input id="id_number" name="id_number" required maxLength={40} />
-                    </div>
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="id_number">Student ID Number</Label>
+                          <Input id="id_number" name="id_number" required maxLength={40} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="course_year">Course &amp; Year</Label>
+                          <Input
+                            id="course_year"
+                            name="course_year"
+                            required
+                            maxLength={80}
+                            placeholder="e.g. BSIT - 2nd Year"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="class_schedule">Class Schedule</Label>
+                          <Select value={signupSchedule} onValueChange={setSignupSchedule}>
+                            <SelectTrigger id="class_schedule">
+                              <SelectValue placeholder="Select session" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CLASS_SCHEDULES.map((s) => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="mobile_number">Active Mobile Number</Label>
+                          <Input
+                            id="mobile_number"
+                            name="mobile_number"
+                            required
+                            maxLength={20}
+                            placeholder="09XXXXXXXXX"
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
                     <Textarea id="address" name="address" rows={2} maxLength={300} />
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input id="signup-email" name="email" type="email" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="username">Username</Label>
-                      <Input id="username" name="username" required maxLength={40} />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input id="signup-email" name="email" type="email" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
