@@ -73,6 +73,7 @@ function AuthPage() {
   const [loginAgreed, setLoginAgreed] = useState(false);
   const [signupAgreed, setSignupAgreed] = useState(false);
   const [signupRole, setSignupRole] = useState("");
+  const [signupSchedule, setSignupSchedule] = useState("");
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [sending, setSending] = useState(false);
