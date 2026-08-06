@@ -239,10 +239,11 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.room_assignment}
-                              onValueChange={(v) => setRow(t.id, { room_assignment: v })}
+                              onValueChange={(v) => setRow(t.id, { room_assignment: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
                               <SelectContent className="max-h-72">
+                                <SelectItem value="__clear__">Clear selection</SelectItem>
                                 {ROOMS.map((room) => (
                                   <SelectItem key={room} value={room}>{room}</SelectItem>
                                 ))}
@@ -252,10 +253,11 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.time_arrival}
-                              onValueChange={(v) => setRow(t.id, { time_arrival: v })}
+                              onValueChange={(v) => setRow(t.id, { time_arrival: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent className="max-h-72">
+                                <SelectItem value="__clear__">Clear</SelectItem>
                                 {TIME_SLOTS.map((s) => (
                                   <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                                 ))}
@@ -265,10 +267,11 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.time_out}
-                              onValueChange={(v) => setRow(t.id, { time_out: v })}
+                              onValueChange={(v) => setRow(t.id, { time_out: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent className="max-h-72">
+                                <SelectItem value="__clear__">Clear</SelectItem>
                                 {TIME_SLOTS.map((s) => (
                                   <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                                 ))}
@@ -289,10 +292,11 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.remarks}
-                              onValueChange={(v) => setRow(t.id, { remarks: v })}
+                              onValueChange={(v) => setRow(t.id, { remarks: v === "__clear__" ? "None" : v })}
                             >
                               <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="__clear__">Clear selection</SelectItem>
                                 {REMARKS_OPTIONS.map((o) => (
                                   <SelectItem key={o} value={o}>{o}</SelectItem>
                                 ))}
