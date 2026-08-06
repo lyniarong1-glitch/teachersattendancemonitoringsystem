@@ -11,7 +11,7 @@ import { AccountDialog } from "@/components/AccountDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-export function AppHeader({ name, role, userId, isSA = false }: { name: string; role: string; userId?: string; isSA?: boolean }) {
+export function AppHeader({ name, role, userId, isSA = false }: { name: string; role: string; userId?: string | undefined; isSA?: boolean | undefined }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
