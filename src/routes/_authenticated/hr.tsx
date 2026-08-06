@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -139,6 +140,18 @@ function HRModule() {
         .maybeSingle();
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: saPhotoUrl } = useQuery({
+    queryKey: ["sa-profile-photo", saProfile?.photo_path],
+    enabled: !!saProfile?.photo_path,
+    queryFn: async () => {
+      const { data, error } = await supabase.storage
+        .from("profile-photos")
+        .createSignedUrl(saProfile?.photo_path ?? "", 3600);
+      if (error) throw error;
+      return data.signedUrl;
     },
   });
 
@@ -493,32 +506,41 @@ function HRModule() {
       </Dialog>
 
       <Dialog open={!!saView} onOpenChange={(o) => !o && setSaView(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Student Assistant Details</DialogTitle>
-            <DialogDescription>Contact and enrollment information on file.</DialogDescription>
-          </DialogHeader>
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
-            {[
-              ["Full Name", saProfile?.full_name],
-              ["Date of Birth", saProfile?.birthdate],
-              ["Course & Year", saProfile?.course_year],
-              ["Class Schedule", saProfile?.class_schedule],
-              ["Student ID Number", saProfile?.id_number],
-              ["Active Mobile Number", saProfile?.mobile_number],
-              ["Email Address", saProfile?.email],
-            ].map(([label, value]) => (
-              <div key={label as string}>
-                <dt className="text-xs uppercase text-muted-foreground">{label}</dt>
-                <dd className="font-bold">{(value as string) || "—"}</dd>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto p-0">
+          <div className="bg-primary p-6 text-primary-foreground">
+            <div className="flex flex-col items-center gap-4 sm:flex-row">
+              <Avatar className="h-24 w-24 border-4 border-primary-foreground/30">
+                <AvatarImage src={saPhotoUrl} className="object-cover" />
+                <AvatarFallback className="text-xl font-bold text-primary">
+                  {(saProfile?.full_name ?? "SA").split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl text-primary-foreground">{saProfile?.full_name ?? "Student Assistant Profile"}</DialogTitle>
+                  <DialogDescription className="text-primary-foreground/80">Student ID: {saProfile?.id_number || "—"}</DialogDescription>
+                </DialogHeader>
               </div>
-            ))}
-          </dl>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSaView(null)}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
-            </Button>
-          </DialogFooter>
+            </div>
+          </div>
+          <div className="space-y-6 p-6">
+            <section><h3 className="mb-3 border-b pb-2 text-lg">Enrollment Information</h3>
+              <dl className="grid gap-4 sm:grid-cols-3">
+                {[["Grade Level", saProfile?.grade_level], ["Course", saProfile?.course ?? saProfile?.course_year], ["Class Schedule", saProfile?.class_schedule]].map(([label, value]) => <div key={label}><dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-bold">{value || "—"}</dd></div>)}
+              </dl>
+            </section>
+            <section><h3 className="mb-3 border-b pb-2 text-lg">Personal Information</h3>
+              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[["First Name", saProfile?.first_name ?? saProfile?.full_name], ["Middle Name", saProfile?.middle_name], ["Last Name", saProfile?.last_name], ["Date of Birth", saProfile?.birthdate], ["Mobile Number", saProfile?.mobile_number], ["Email Address", saProfile?.email]].map(([label, value]) => <div key={label}><dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-bold">{value || "—"}</dd></div>)}
+              </dl>
+            </section>
+            <section><h3 className="mb-3 border-b pb-2 text-lg">Address</h3>
+              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[["Street", saProfile?.street], ["Barangay", saProfile?.barangay], ["City", saProfile?.city], ["Province", saProfile?.province]].map(([label, value]) => <div key={label}><dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-bold">{value || "—"}</dd></div>)}
+              </dl>
+            </section>
+            <DialogFooter><Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button></DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -105,39 +105,69 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          barangay: string | null
           birthdate: string | null
+          city: string | null
           class_schedule: string | null
+          course: string | null
           course_year: string | null
           created_at: string
           email: string
+          first_name: string | null
           full_name: string
+          grade_level: string | null
           id: string
           id_number: string | null
+          last_name: string | null
+          middle_name: string | null
           mobile_number: string | null
+          photo_path: string | null
+          province: string | null
+          street: string | null
         }
         Insert: {
           address?: string | null
+          barangay?: string | null
           birthdate?: string | null
+          city?: string | null
           class_schedule?: string | null
+          course?: string | null
           course_year?: string | null
           created_at?: string
           email: string
+          first_name?: string | null
           full_name: string
+          grade_level?: string | null
           id: string
           id_number?: string | null
+          last_name?: string | null
+          middle_name?: string | null
           mobile_number?: string | null
+          photo_path?: string | null
+          province?: string | null
+          street?: string | null
         }
         Update: {
           address?: string | null
+          barangay?: string | null
           birthdate?: string | null
+          city?: string | null
           class_schedule?: string | null
+          course?: string | null
           course_year?: string | null
           created_at?: string
           email?: string
+          first_name?: string | null
           full_name?: string
+          grade_level?: string | null
           id?: string
           id_number?: string | null
+          last_name?: string | null
+          middle_name?: string | null
           mobile_number?: string | null
+          photo_path?: string | null
+          province?: string | null
+          street?: string | null
         }
         Relationships: []
       }
