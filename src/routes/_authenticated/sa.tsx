@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Send, Trash2 } from "lucide-react";
+import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteMyAccount } from "@/lib/account.functions";
 import { useSession } from "@/hooks/use-session";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -12,17 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import {
@@ -166,23 +154,6 @@ function SAModule() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const navigate = useNavigate();
-  const removeAccount = useMutation({
-    mutationFn: async () => {
-      await deleteMyAccount();
-    },
-    onSuccess: async () => {
-      await queryClient.cancelQueries();
-      queryClient.clear();
-      await supabase.auth.signOut();
-      toast.success("Your account has been deleted");
-      void navigate({ to: "/", replace: true });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-
-
   if (role && role !== "student_assistant") {
     return (
       <div className="min-h-screen">
@@ -247,9 +218,6 @@ function SAModule() {
                       </th>
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Remarks
-                      </th>
-                      <th rowSpan={2} className="border border-border px-3 py-2 text-center">
-                        Undo
                       </th>
                     </tr>
                     <tr className="bg-secondary/60">
@@ -340,23 +308,6 @@ function SAModule() {
                               />
                             )}
                           </td>
-                          <td className="border border-border p-1 text-center">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              type="button"
-                              disabled={!rows[t.id]}
-                              onClick={() =>
-                                setRows((prev) => {
-                                  const next = { ...prev };
-                                  delete next[t.id];
-                                  return next;
-                                })
-                              }
-                            >
-                              Clear
-                            </Button>
-                          </td>
                         </tr>
                       );
                     })}
@@ -435,40 +386,6 @@ function SAModule() {
           </CardContent>
         </Card>
 
-        <Card className="border-destructive/40">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base text-destructive">Delete My Account</CardTitle>
-            <CardDescription>
-              Resigning? Deleting your account permanently removes your sign-in access to this
-              system. Attendance records you submitted stay in the HR master table.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={removeAccount.isPending}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {removeAccount.isPending ? "Deleting…" : "Delete Account"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This cannot be undone. You will be signed out immediately and will no longer be
-                    able to access the Teachers Attendance Monitoring System.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => removeAccount.mutate()}>
-                    Yes, delete my account
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );
