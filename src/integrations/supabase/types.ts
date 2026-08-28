@@ -27,6 +27,8 @@ export type Database = {
           remarks: string | null
           room_assignment: string
           submitted_by: string | null
+          submitted_by_id_number: string | null
+          submitted_by_name: string | null
           teacher_id: string
           time_arrival: string | null
           time_out: string | null
@@ -44,6 +46,8 @@ export type Database = {
           remarks?: string | null
           room_assignment: string
           submitted_by?: string | null
+          submitted_by_id_number?: string | null
+          submitted_by_name?: string | null
           teacher_id: string
           time_arrival?: string | null
           time_out?: string | null
@@ -61,6 +65,8 @@ export type Database = {
           remarks?: string | null
           room_assignment?: string
           submitted_by?: string | null
+          submitted_by_id_number?: string | null
+          submitted_by_name?: string | null
           teacher_id?: string
           time_arrival?: string | null
           time_out?: string | null

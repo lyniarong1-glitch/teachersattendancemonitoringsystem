@@ -100,10 +100,18 @@ type RecordRow = {
   teacher_id: string;
   department_id: string;
   submitted_by: string | null;
+  submitted_by_name: string | null;
+  submitted_by_id_number: string | null;
   teachers: { full_name: string } | null;
   departments: { name: string } | null;
   profiles: { full_name: string } | null;
 };
+
+/** Name of the SA who submitted a record — falls back to the stored snapshot
+ *  so deleted accounts keep their attribution. */
+function submitterName(r: RecordRow) {
+  return r.profiles?.full_name ?? r.submitted_by_name ?? "—";
+}
 
 const DATES_PER_PAGE = 3;
 const SEEN_KEY = "tams:hr:records-seen-at";
@@ -125,6 +133,7 @@ function HRModule() {
   const [seenAt, setSeenAt] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [deleteSa, setDeleteSa] = useState<{ id: string; name: string } | null>(null);
+  const [saListOpen, setSaListOpen] = useState(false);
 
   useEffect(() => {
     setSeenAt(window.localStorage.getItem(SEEN_KEY) ?? new Date(0).toISOString());
@@ -153,7 +162,7 @@ function HRModule() {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, created_at, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, created_at, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, submitted_by_name, submitted_by_id_number, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -161,6 +170,41 @@ function HRModule() {
     },
   });
 
+
+  // New/synced submissions appear on this page as soon as they reach the server.
+  useEffect(() => {
+    const channel = supabase
+      .channel("hr-attendance-feed")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance_records" },
+        () => void queryClient.invalidateQueries({ queryKey: ["all-records"] }),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const { data: studentAssistants = [] } = useQuery({
+    queryKey: ["registered-sas"],
+    queryFn: async () => {
+      const { data: roles, error: roleError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "student_assistant");
+      if (roleError) throw roleError;
+      const ids = (roles ?? []).map((r) => r.user_id);
+      if (!ids.length) return [];
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, id_number, email, mobile_number, course, course_year, grade_level, class_schedule")
+        .in("id", ids)
+        .order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
@@ -233,6 +277,7 @@ function HRModule() {
       setDeleteSa(null);
       setSaView(null);
       void queryClient.invalidateQueries({ queryKey: ["all-records"] });
+      void queryClient.invalidateQueries({ queryKey: ["registered-sas"] });
       toast.success("Student Assistant account deleted");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -278,7 +323,7 @@ function HRModule() {
       r.attendance_status,
       r.remarks ?? "",
       formatTime(r.time_submitted?.slice(0, 5)),
-      r.profiles?.full_name ?? "",
+      submitterName(r) === "—" ? "" : submitterName(r),
       r.last_edited_at ? new Date(r.last_edited_at).toLocaleString() : "",
     ]);
     const csv = [header, ...body]
@@ -306,7 +351,7 @@ function HRModule() {
 
   return (
     <div className="min-h-screen campus-bg">
-      <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
+      <AppHeader name={fullName} role="Human Resources" userId={user?.id} onViewStudentAssistants={() => setSaListOpen(true)} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
         <Card className={`no-print border-l-4 ${newRecords.length ? "border-l-primary" : "border-l-muted"}`}>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
@@ -329,7 +374,7 @@ function HRModule() {
                   {newRecords.length
                     ? newRecords
                         .slice(0, 3)
-                        .map((r) => `${r.teachers?.full_name ?? "Teacher"} by ${r.profiles?.full_name ?? "SA"}`)
+                        .map((r) => `${r.teachers?.full_name ?? "Teacher"} by ${submitterName(r)}`)
                         .join(" · ")
                     : "You're up to date. New submissions appear here automatically."}
                 </p>
@@ -373,7 +418,7 @@ function HRModule() {
                     <TableCell>{r.departments?.name}</TableCell>
                     <TableCell><Badge variant="secondary">{r.attendance_status}</Badge></TableCell>
                     <TableCell>{r.date_submitted}</TableCell>
-                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                    <TableCell>{submitterName(r)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -507,16 +552,23 @@ function HRModule() {
                           </TableCell>
                           <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
                           <TableCell>
-                            {r.submitted_by ? (
+                            {r.submitted_by && r.profiles?.full_name ? (
                               <button
                                 type="button"
                                 className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
                                 onClick={() => setSaView(r.submitted_by)}
                               >
-                                {r.profiles?.full_name ?? "Student Assistant"}
+                                {r.profiles.full_name}
                               </button>
                             ) : (
-                              "—"
+                              <span className="font-bold">
+                                {submitterName(r)}
+                                {r.submitted_by_name && !r.profiles?.full_name && (
+                                  <span className="block text-xs font-normal text-muted-foreground">
+                                    account deleted
+                                  </span>
+                                )}
+                              </span>
                             )}
                           </TableCell>
                           <TableCell className="no-print">
@@ -613,7 +665,7 @@ function HRModule() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                    <TableCell>{submitterName(r)}</TableCell>
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                         <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
@@ -673,6 +725,73 @@ function HRModule() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={saListOpen} onOpenChange={setSaListOpen}>
+        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registered Student Assistants</DialogTitle>
+            <DialogDescription>
+              {studentAssistants.length} registered account
+              {studentAssistants.length === 1 ? "" : "s"}. Open a profile for full details, or
+              delete an account — submitted attendance records are always preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Full Name</TableHead>
+                <TableHead>ID Number</TableHead>
+                <TableHead>Course / Year</TableHead>
+                <TableHead>Class Schedule</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Mobile</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {studentAssistants.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    No Student Assistant accounts registered yet.
+                  </TableCell>
+                </TableRow>
+              )}
+              {studentAssistants.map((sa) => (
+                <TableRow key={sa.id}>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
+                      onClick={() => { setSaListOpen(false); setSaView(sa.id); }}
+                    >
+                      {sa.full_name}
+                    </button>
+                  </TableCell>
+                  <TableCell>{sa.id_number || "—"}</TableCell>
+                  <TableCell>{[sa.grade_level, sa.course ?? sa.course_year].filter(Boolean).join(" · ") || "—"}</TableCell>
+                  <TableCell>{sa.class_schedule || "—"}</TableCell>
+                  <TableCell className="break-all">{sa.email}</TableCell>
+                  <TableCell>{sa.mobile_number || "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteSa({ id: sa.id, name: sa.full_name })}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaListOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
 
       <AlertDialog open={!!deleteSa} onOpenChange={(o) => !o && setDeleteSa(null)}>
         <AlertDialogContent>
