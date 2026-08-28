@@ -73,7 +73,8 @@ const EMPTY_ROW: RowState = {
 };
 
 type Dept = { id: string; name: string };
-type Teacher = { id: string; full_name: string };
+type Teacher = { id: string; full_name: string; department_id: string };
+
 
 function SAModule() {
   const { user, role, fullName } = useSession();
