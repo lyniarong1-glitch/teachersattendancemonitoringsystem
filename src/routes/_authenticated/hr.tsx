@@ -211,6 +211,24 @@ function HRModule() {
     },
   });
 
+  // Once a submitted batch is reviewed, register it in the Master Attendance Table.
+  useEffect(() => {
+    if (!batchView || batchRecords.length === 0) return;
+    const keys = [
+      ...new Set(
+        batchRecords.map(
+          (r) => `${r.date_submitted}|${r.time_submitted}|${r.submitted_by ?? "unknown"}`,
+        ),
+      ),
+    ];
+    addReviewedKeys(keys);
+    setHighlightKey(keys[0] ?? null);
+    queryClient.invalidateQueries({ queryKey: ["all-records"] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchView?.id, batchRecords.length]);
+
+
+
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
     enabled: !!saView,
