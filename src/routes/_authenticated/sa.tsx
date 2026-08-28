@@ -68,6 +68,7 @@ function SAModule() {
   const { user, role, fullName } = useSession();
   const queryClient = useQueryClient();
   const [departmentId, setDepartmentId] = useState("");
+  const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Record<string, RowState>>({});
 
   const setRow = (id: string, patch: Partial<RowState>) =>
@@ -95,6 +96,13 @@ function SAModule() {
       return data;
     },
   });
+
+  const visibleTeachers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? teachers.filter((t) => t.full_name.toLowerCase().includes(q)) : teachers;
+  }, [teachers, search]);
+
+  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
   // Every teacher with an attendance status checked is submitted — Present, Late or Absent.
   const readyRows = useMemo(
