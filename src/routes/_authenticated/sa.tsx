@@ -209,10 +209,21 @@ function SAModule() {
         .upsert(records, { onConflict: "client_uuid", ignoreDuplicates: true });
       if (error) throw error;
 
-      // Clear only the rows that were successfully submitted, in every department.
+      // Read back exactly what was stored, so drafts are only cleared for rows
+      // that are confirmed saved on the server with the values as recorded.
+      const { data: saved, error: verifyError } = await supabase
+        .from("attendance_records")
+        .select("client_uuid, teacher_id, department_id")
+        .in("client_uuid", records.map((r) => r.client_uuid));
+      if (verifyError) throw verifyError;
+
+      const confirmed = saved ?? [];
+      if (confirmed.length === 0) throw new Error("Submission could not be confirmed — nothing was cleared");
+
+      // Clear only the rows confirmed saved, in every department.
       setDrafts((prev) => {
         const next: DraftsByDepartment = { ...prev };
-        for (const r of records) {
+        for (const r of confirmed) {
           const dept = { ...(next[r.department_id] ?? {}) };
           delete dept[r.teacher_id];
           next[r.department_id] = dept;
@@ -221,7 +232,7 @@ function SAModule() {
         return next;
       });
 
-      return { count: records.length };
+      return { count: confirmed.length };
     },
     onSuccess: ({ count }) => {
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
