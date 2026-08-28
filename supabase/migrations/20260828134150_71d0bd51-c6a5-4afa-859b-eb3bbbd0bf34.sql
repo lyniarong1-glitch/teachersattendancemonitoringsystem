@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.stamp_submitter() FROM PUBLIC, anon, authenticated;
