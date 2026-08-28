@@ -257,7 +257,7 @@ function HRModule() {
       formatTime(r.time_out),
       r.attendance_status,
       r.remarks ?? "",
-      formatTime(r.time_submitted?.slice(0, 5)),
+      formatTimeExact(r.time_submitted),
       r.profiles?.full_name ?? "",
       r.last_edited_at ? new Date(r.last_edited_at).toLocaleString() : "",
     ]);
@@ -451,7 +451,7 @@ function HRModule() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
+                          <TableCell>{formatTimeExact(r.time_submitted)}</TableCell>
                           <TableCell>
                             {r.submitted_by ? (
                               <button
@@ -541,7 +541,7 @@ function HRModule() {
                 {teacherRecords.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{r.date_submitted}</TableCell>
-                    <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
+                    <TableCell>{formatTimeExact(r.time_submitted)}</TableCell>
                     <TableCell>{r.departments?.name}</TableCell>
                     <TableCell>{r.room_assignment}</TableCell>
                     <TableCell>{formatTime(r.time_arrival)}</TableCell>

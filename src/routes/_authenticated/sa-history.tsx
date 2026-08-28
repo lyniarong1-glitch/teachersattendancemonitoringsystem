@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatTime } from "@/lib/attendance-constants";
+import { formatTime, formatTimeExact, formatTimeExact } from "@/lib/attendance-constants";
 
 export const Route = createFileRoute("/_authenticated/sa-history")({
   head: () => ({
@@ -130,7 +130,7 @@ function SAHistory() {
             {visible.map(({ key, group, date, time }) => (
               <section key={key} className="space-y-2">
                 <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                  Date Submitted: {date} · {formatTime(time?.slice(0, 5))} · {group.length} record
+                  Date Submitted: {date} · {formatTimeExact(time)} · {group.length} record
                   {group.length === 1 ? "" : "s"}
                 </div>
 
@@ -153,7 +153,7 @@ function SAHistory() {
                       {group.map((r) => (
                         <tr key={r.id}>
                           <td className="border border-border px-3 py-2">
-                            {formatTime(r.time_submitted?.slice(0, 5))}
+                            {formatTimeExact(r.time_submitted)}
                           </td>
                           <td className="border border-border px-3 py-2 font-medium">
                             {r.teachers?.full_name}
