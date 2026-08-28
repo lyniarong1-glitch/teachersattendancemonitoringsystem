@@ -24,8 +24,8 @@ import {
   REMARKS_OPTIONS,
   STATUS_OPTIONS,
   TIME_SLOTS,
-  formatTime,
 } from "@/lib/attendance-constants";
+
 import {
   cacheGet,
   cacheSet,
