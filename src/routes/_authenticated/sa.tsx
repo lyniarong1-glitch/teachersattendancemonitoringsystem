@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, CloudOff, RefreshCw, Search, Send, Wifi } from "lucide-react";
+import { CloudOff, RefreshCw, Search, Send, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -169,31 +169,16 @@ function SAModule() {
     return teachers.filter((t) => t.department_id === departmentId);
   }, [teachers, search, departmentId]);
 
-  // Pagination over the visible roster (drafts are kept per teacher, never per page).
-  const TEACHERS_PER_PAGE = 10;
-  const [rosterPage, setRosterPage] = useState(1);
-  const totalRosterPages = Math.max(1, Math.ceil(visibleTeachers.length / TEACHERS_PER_PAGE));
-  const currentRosterPage = Math.min(rosterPage, totalRosterPages);
-  const pagedTeachers = useMemo(
-    () =>
-      visibleTeachers.slice(
-        (currentRosterPage - 1) * TEACHERS_PER_PAGE,
-        currentRosterPage * TEACHERS_PER_PAGE,
-      ),
-    [visibleTeachers, currentRosterPage],
-  );
-
   // Grouped by department so the sheet mirrors the printed roster format.
   const teacherGroups = useMemo(() => {
     const map = new Map<string, Teacher[]>();
-    for (const t of pagedTeachers) {
+    for (const t of visibleTeachers) {
       const list = map.get(t.department_id);
       if (list) list.push(t);
       else map.set(t.department_id, [t]);
     }
     return [...map.entries()];
-  }, [pagedTeachers]);
-
+  }, [visibleTeachers]);
 
 
   const isComplete = (r?: RowState) => {
@@ -378,10 +363,10 @@ function SAModule() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-center gap-3 rounded-md border-2 border-foreground bg-secondary px-3 py-2 text-secondary-foreground">
+              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
                 <Label className="whitespace-nowrap uppercase">Select Department:</Label>
-                <Select value={departmentId} onValueChange={(v) => { setDepartmentId(v); setRosterPage(1); }}>
-                  <SelectTrigger className="h-9 w-48 border-0 bg-transparent shadow-none focus:ring-0">
+                <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
+                  <SelectTrigger className="h-9 w-48 border-0 shadow-none focus:ring-0">
                     <SelectValue placeholder="All departments" />
                   </SelectTrigger>
                   <SelectContent>
@@ -391,7 +376,7 @@ function SAModule() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-3 rounded-md border-2 border-foreground bg-secondary px-3 py-2 text-secondary-foreground">
+              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
                 <Label htmlFor="teacher-search" className="whitespace-nowrap uppercase">
                   Search Teachers Name:
                 </Label>
@@ -399,15 +384,14 @@ function SAModule() {
                   <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="teacher-search"
-                    className="h-9 w-48 border-0 bg-transparent pl-8 shadow-none focus-visible:ring-0"
+                    className="h-9 w-48 border-0 pl-8 shadow-none focus-visible:ring-0"
                     placeholder="Type a teacher's name"
                     value={search}
-                    onChange={(e) => { setSearch(e.target.value); setRosterPage(1); }}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
               </div>
             </div>
-
 
             {teacherGroups.length === 0 && (
               <p className="text-muted-foreground">No teacher matches “{search}”.</p>
@@ -540,34 +524,6 @@ function SAModule() {
                 </div>
               </section>
             ))}
-
-            {totalRosterPages > 1 && (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Page {currentRosterPage} of {totalRosterPages} · {visibleTeachers.length} teachers
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="font-bold"
-                    disabled={currentRosterPage <= 1}
-                    onClick={() => setRosterPage(currentRosterPage - 1)}
-                  >
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="font-bold"
-                    disabled={currentRosterPage >= totalRosterPages}
-                    onClick={() => setRosterPage(currentRosterPage + 1)}
-                  >
-                    Next
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
 
 
             <div className="flex justify-start pt-2">
