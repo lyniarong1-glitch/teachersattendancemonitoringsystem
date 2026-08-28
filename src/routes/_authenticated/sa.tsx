@@ -541,52 +541,8 @@ function SAModule() {
           </CardContent>
         </Card>
 
-        {pending.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Saved on This Device (not yet synced)</CardTitle>
-              <CardDescription>
-                These records are kept exactly as you recorded them and will be sent to HR once synced.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full min-w-[900px] border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-secondary/60">
-                      <th className="border border-border px-3 py-2 text-left">Date Recorded</th>
-                      <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
-                      <th className="border border-border px-3 py-2 text-left">Department</th>
-                      <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
-                      <th className="border border-border px-3 py-2 text-left">Time In</th>
-                      <th className="border border-border px-3 py-2 text-left">Time Out</th>
-                      <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
-                      <th className="border border-border px-3 py-2 text-left">Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pending.map((r) => (
-                      <tr key={r.client_uuid}>
-                        <td className="border border-border px-3 py-2">
-                          {r.date_submitted} {formatTime(r.time_submitted.slice(0, 5))}
-                        </td>
-                        <td className="border border-border px-3 py-2 font-medium">{r.teacher_name}</td>
-                        <td className="border border-border px-3 py-2">{r.department_name}</td>
-                        <td className="border border-border px-3 py-2">{r.room_assignment}</td>
-                        <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
-                        <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
-                        <td className="border border-border px-3 py-2">
-                          <Badge variant="secondary">{r.attendance_status}</Badge>
-                        </td>
-                        <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+
+
 
 
 
