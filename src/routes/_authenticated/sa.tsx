@@ -73,7 +73,8 @@ const EMPTY_ROW: RowState = {
 };
 
 type Dept = { id: string; name: string };
-type Teacher = { id: string; full_name: string };
+type Teacher = { id: string; full_name: string; department_id: string };
+
 
 function SAModule() {
   const { user, role, fullName } = useSession();
@@ -86,7 +87,7 @@ function SAModule() {
   const [syncing, setSyncing] = useState(false);
   const hydratedFor = useRef<string | null>(null);
 
-  const rows = drafts[departmentId] ?? {};
+  const getRow = (t: Teacher): RowState => drafts[t.department_id]?.[t.id] ?? EMPTY_ROW;
 
   // Load locally-saved drafts + pending queue once the user is known.
   useEffect(() => {
@@ -108,16 +109,17 @@ function SAModule() {
     };
   }, []);
 
-  const setRow = (id: string, patch: Partial<RowState>) => {
-    if (!departmentId) return;
+  const setRow = (deptId: string, id: string, patch: Partial<RowState>) => {
+    if (!deptId) return;
     setDrafts((prev) => {
-      const dept = { ...(prev[departmentId] ?? {}) };
+      const dept = { ...(prev[deptId] ?? {}) };
       dept[id] = { ...EMPTY_ROW, ...dept[id], ...patch };
-      const next = { ...prev, [departmentId]: dept };
+      const next = { ...prev, [deptId]: dept };
       if (user) saveDrafts(user.id, next);
       return next;
     });
   };
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -137,26 +139,23 @@ function SAModule() {
   });
 
   const { data: teachers = [] } = useQuery({
-    queryKey: ["teachers", departmentId],
-    enabled: !!departmentId,
+    queryKey: ["teachers", "all"],
     queryFn: async () => {
       try {
         const { data, error } = await supabase
           .from("teachers")
-          .select("id, full_name")
-          .eq("department_id", departmentId)
+          .select("id, full_name, department_id")
           .order("full_name");
         if (error) throw error;
-        cacheSet(`teachers:${departmentId}`, data);
+        cacheSet("teachers:all", data);
         return data as Teacher[];
       } catch (e) {
-        const cached = cacheGet<Teacher[]>(`teachers:${departmentId}`);
+        const cached = cacheGet<Teacher[]>("teachers:all");
         if (cached) return cached;
         throw e;
       }
     },
-    initialData: () =>
-      departmentId ? (cacheGet<Teacher[]>(`teachers:${departmentId}`) ?? undefined) : undefined,
+    initialData: () => cacheGet<Teacher[]>("teachers:all") ?? undefined,
   });
 
   const { data: mine = [] } = useQuery({
@@ -169,17 +168,19 @@ function SAModule() {
           "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
         )
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(200);
       if (error) throw error;
       return data;
     },
   });
 
+  // Search works across every department, even before one is selected.
   const visibleTeachers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return teachers;
-    return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
-  }, [teachers, search]);
+    if (q) return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
+    if (!departmentId) return [];
+    return teachers.filter((t) => t.department_id === departmentId);
+  }, [teachers, search, departmentId]);
 
   const isComplete = (r?: RowState) => {
     if (!r) return false;
@@ -188,14 +189,26 @@ function SAModule() {
     return true;
   };
 
-  // Ready rows are computed from the full roster, never from the search view,
-  // so filtering can never drop a recorded row.
+  // Ready rows are computed from every department's saved drafts, never from the
+  // search view, so filtering or switching departments can never drop a record.
   const readyRows = useMemo(
-    () => teachers.filter((t) => isComplete(rows[t.id])),
-    [teachers, rows],
+    () => teachers.filter((t) => isComplete(drafts[t.department_id]?.[t.id])),
+    [teachers, drafts],
   );
 
-  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
+
+  const deptName = (id: string) => departments.find((d) => d.id === id)?.name ?? "";
+
+  const historyGroups = useMemo(() => {
+    const map = new Map<string, typeof mine>();
+    for (const r of mine) {
+      const list = map.get(r.date_submitted);
+      if (list) list.push(r);
+      else map.set(r.date_submitted, [r]);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [mine]);
+
 
   const pushToServer = useCallback(
     async (records: PendingRecord[]) => {
@@ -259,13 +272,13 @@ function SAModule() {
       if (!user) throw new Error("Not signed in");
       const stamp = localDateTime();
       const records: PendingRecord[] = readyRows.map((t) => {
-        const r = rows[t.id]!;
+        const r = drafts[t.department_id]![t.id]!;
         return {
           client_uuid: newClientUuid(),
           teacher_id: t.id,
           teacher_name: t.full_name,
-          department_id: departmentId,
-          department_name: departmentName,
+          department_id: t.department_id,
+          department_name: deptName(t.department_id),
           submitted_by: user.id,
           room_assignment: r.room_assignment,
           time_arrival: r.time_arrival || null,
@@ -281,14 +294,18 @@ function SAModule() {
       // Always persist locally first so nothing can be lost.
       const queue = enqueue(user.id, records);
       setPending(queue);
-      // Clear only the rows that were captured into the queue.
+      // Clear only the rows that were captured into the queue, in every department.
       setDrafts((prev) => {
-        const dept = { ...(prev[departmentId] ?? {}) };
-        for (const r of records) delete dept[r.teacher_id];
-        const next = { ...prev, [departmentId]: dept };
+        const next: DraftsByDepartment = { ...prev };
+        for (const r of records) {
+          const dept = { ...(next[r.department_id] ?? {}) };
+          delete dept[r.teacher_id];
+          next[r.department_id] = dept;
+        }
         saveDrafts(user.id, next);
         return next;
       });
+
 
       if (!navigator.onLine) return { count: records.length, offline: true };
 
@@ -350,9 +367,11 @@ function SAModule() {
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Pick a department, fill in the rows you observed, then submit. Entries are saved on this
-              device automatically — you can work offline and switch departments without losing them.
+              Pick a department — or search a teacher's name across every department — fill in the
+              rows you observed, then submit. Entries are saved on this device automatically, so you
+              can work offline and switch departments without losing anything.
             </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="flex flex-wrap gap-4">
@@ -368,7 +387,7 @@ function SAModule() {
                 </Select>
               </div>
               <div className="w-full max-w-xs space-y-2">
-                <Label htmlFor="teacher-search">Search teacher</Label>
+                <Label htmlFor="teacher-search">Search teacher (all departments)</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -377,23 +396,27 @@ function SAModule() {
                     placeholder="Type a teacher's name"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    disabled={!departmentId}
                   />
                 </div>
               </div>
             </div>
 
-            {departmentId && (
+
+            {(departmentId || search.trim()) && (
               <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full min-w-[1000px] border-collapse text-sm">
+                <table className="w-full min-w-[1100px] border-collapse text-sm">
                   <thead>
                     <tr className="bg-secondary/60">
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Teacher's Name
                       </th>
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Department
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Room Assigned
                       </th>
+
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Time In
                       </th>
@@ -418,22 +441,26 @@ function SAModule() {
                   <tbody>
                     {visibleTeachers.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="border border-border px-3 py-6 text-center text-muted-foreground">
+                        <td colSpan={9} className="border border-border px-3 py-6 text-center text-muted-foreground">
                           No teacher matches “{search}”.
                         </td>
                       </tr>
                     )}
                     {visibleTeachers.map((t) => {
-                      const r = rows[t.id] ?? EMPTY_ROW;
+                      const r = getRow(t);
                       return (
                         <tr key={t.id} className="align-top">
                           <td className="border border-border px-3 py-2 font-medium">
                             {t.full_name}
                           </td>
+                          <td className="border border-border px-3 py-2 text-muted-foreground">
+                            {deptName(t.department_id)}
+                          </td>
+
                           <td className="border border-border p-1">
                             <Select
                               value={r.room_assignment}
-                              onValueChange={(v) => setRow(t.id, { room_assignment: v === "__clear__" ? "" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { room_assignment: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
                               <SelectContent className="max-h-72">
@@ -447,7 +474,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.time_arrival}
-                              onValueChange={(v) => setRow(t.id, { time_arrival: v === "__clear__" ? "" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { time_arrival: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent className="max-h-72">
@@ -461,7 +488,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.time_out}
-                              onValueChange={(v) => setRow(t.id, { time_out: v === "__clear__" ? "" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { time_out: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent className="max-h-72">
@@ -478,7 +505,7 @@ function SAModule() {
                                 aria-label={`${s} — ${t.full_name}`}
                                 checked={r.attendance_status === s}
                                 onCheckedChange={(c) =>
-                                  setRow(t.id, { attendance_status: c ? s : "" })
+                                  setRow(t.department_id, t.id, { attendance_status: c ? s : "" })
                                 }
                               />
                             </td>
@@ -486,7 +513,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.remarks}
-                              onValueChange={(v) => setRow(t.id, { remarks: v === "__clear__" ? "None" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { remarks: v === "__clear__" ? "None" : v })}
                             >
                               <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
                               <SelectContent>
@@ -501,7 +528,7 @@ function SAModule() {
                                 className="mt-1 h-9 w-44"
                                 maxLength={200}
                                 value={r.other_remark}
-                                onChange={(e) => setRow(t.id, { other_remark: e.target.value })}
+                                onChange={(e) => setRow(t.department_id, t.id, { other_remark: e.target.value })}
                                 placeholder="Specify remark"
                               />
                             )}
@@ -574,62 +601,67 @@ function SAModule() {
           </Card>
         )}
 
-        <Card>
+        <Card id="submission-history" className="scroll-mt-24">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">My Recent Submissions</CardTitle>
-            <CardDescription>Most recent submissions first.</CardDescription>
+            <CardTitle className="text-base">My Recent Submission History</CardTitle>
+            <CardDescription>
+              {mine.length} submitted record{mine.length === 1 ? "" : "s"}, grouped by the date they
+              were submitted (most recent first).
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full min-w-[900px] border-collapse text-sm">
-                <thead>
-                  <tr className="bg-secondary/60">
-                    <th className="border border-border px-3 py-2 text-left">Date Submitted</th>
-                    <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
-                    <th className="border border-border px-3 py-2 text-left">Department</th>
-                    <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
-                    <th className="border border-border px-3 py-2 text-left">Time In</th>
-                    <th className="border border-border px-3 py-2 text-left">Time Out</th>
-                    <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
-                    <th className="border border-border px-3 py-2 text-left">Remarks</th>
-                    <th className="border border-border px-3 py-2 text-left">Submitted By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mine.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="border border-border px-3 py-6 text-center text-muted-foreground"
-                      >
-                        No records submitted yet.
-                      </td>
-                    </tr>
-                  )}
-                  {mine.map((r) => (
-                    <tr key={r.id}>
-                      <td className="border border-border px-3 py-2">
-                        {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
-                      </td>
-                      <td className="border border-border px-3 py-2 font-medium">
-                        {r.teachers?.full_name}
-                      </td>
-                      <td className="border border-border px-3 py-2">{r.departments?.name}</td>
-                      <td className="border border-border px-3 py-2">{r.room_assignment}</td>
-                      <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
-                      <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
-                      <td className="border border-border px-3 py-2">
-                        <Badge variant="secondary">{r.attendance_status}</Badge>
-                      </td>
-                      <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
-                      <td className="border border-border px-3 py-2">{fullName}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="space-y-6">
+            {mine.length === 0 && (
+              <p className="text-muted-foreground">No records submitted yet.</p>
+            )}
+            {historyGroups.map(([date, rowsForDate]) => (
+              <section key={date} className="space-y-2">
+                <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
+                  Date Submitted: {date} · {rowsForDate.length} record
+                  {rowsForDate.length === 1 ? "" : "s"}
+                </div>
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="w-full min-w-[900px] border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-secondary/60">
+                        <th className="border border-border px-3 py-2 text-left">Time Submitted</th>
+                        <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
+                        <th className="border border-border px-3 py-2 text-left">Department</th>
+                        <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
+                        <th className="border border-border px-3 py-2 text-left">Time In</th>
+                        <th className="border border-border px-3 py-2 text-left">Time Out</th>
+                        <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
+                        <th className="border border-border px-3 py-2 text-left">Remarks</th>
+                        <th className="border border-border px-3 py-2 text-left">Submitted By</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rowsForDate.map((r) => (
+                        <tr key={r.id}>
+                          <td className="border border-border px-3 py-2">
+                            {formatTime(r.time_submitted?.slice(0, 5))}
+                          </td>
+                          <td className="border border-border px-3 py-2 font-medium">
+                            {r.teachers?.full_name}
+                          </td>
+                          <td className="border border-border px-3 py-2">{r.departments?.name}</td>
+                          <td className="border border-border px-3 py-2">{r.room_assignment}</td>
+                          <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
+                          <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
+                          <td className="border border-border px-3 py-2">
+                            <Badge variant="secondary">{r.attendance_status}</Badge>
+                          </td>
+                          <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
+                          <td className="border border-border px-3 py-2">{fullName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
           </CardContent>
         </Card>
+
 
       </main>
     </div>

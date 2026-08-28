@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Bell,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -10,9 +11,11 @@ import {
   Pencil,
   Printer,
   Search,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteStudentAssistant } from "@/lib/account.functions";
 import { useSession } from "@/hooks/use-session";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,16 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -38,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 import {
   Select,
   SelectContent,
@@ -74,6 +88,7 @@ export const Route = createFileRoute("/_authenticated/hr")({
 
 type RecordRow = {
   id: string;
+  created_at: string;
   room_assignment: string;
   time_arrival: string | null;
   time_out: string | null;
@@ -91,6 +106,8 @@ type RecordRow = {
 };
 
 const DATES_PER_PAGE = 3;
+const SEEN_KEY = "tams:hr:records-seen-at";
+
 
 function statusVariant(s: RecordRow["attendance_status"]) {
   return s === "Present" ? "default" : s === "Late" ? "secondary" : "destructive";
@@ -105,6 +122,20 @@ function HRModule() {
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
   const [saView, setSaView] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [seenAt, setSeenAt] = useState<string | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [deleteSa, setDeleteSa] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    setSeenAt(window.localStorage.getItem(SEEN_KEY) ?? new Date(0).toISOString());
+  }, []);
+
+  const markSeen = () => {
+    const now = new Date().toISOString();
+    window.localStorage.setItem(SEEN_KEY, now);
+    setSeenAt(now);
+  };
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -117,17 +148,19 @@ function HRModule() {
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["all-records"],
+    refetchInterval: 30000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, created_at, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as unknown as RecordRow[];
     },
   });
+
 
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
@@ -188,6 +221,23 @@ function HRModule() {
         ),
       );
   }, [records, teacherView]);
+
+  const newRecords = useMemo(
+    () => (seenAt ? records.filter((r) => r.created_at > seenAt) : []),
+    [records, seenAt],
+  );
+
+  const removeSa = useMutation({
+    mutationFn: (userId: string) => deleteStudentAssistant({ data: { userId } }),
+    onSuccess: () => {
+      setDeleteSa(null);
+      setSaView(null);
+      void queryClient.invalidateQueries({ queryKey: ["all-records"] });
+      toast.success("Student Assistant account deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
@@ -258,7 +308,84 @@ function HRModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
+        <Card className={`no-print border-l-4 ${newRecords.length ? "border-l-primary" : "border-l-muted"}`}>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div className="flex items-center gap-3">
+              <span className="relative">
+                <Bell className={`h-5 w-5 ${newRecords.length ? "text-primary" : "text-muted-foreground"}`} />
+                {newRecords.length > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {newRecords.length > 99 ? "99+" : newRecords.length}
+                  </span>
+                )}
+              </span>
+              <div>
+                <p className="font-bold">
+                  {newRecords.length
+                    ? `${newRecords.length} new attendance record${newRecords.length === 1 ? "" : "s"} submitted`
+                    : "No new attendance records"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {newRecords.length
+                    ? newRecords
+                        .slice(0, 3)
+                        .map((r) => `${r.teachers?.full_name ?? "Teacher"} by ${r.profiles?.full_name ?? "SA"}`)
+                        .join(" · ")
+                    : "You're up to date. New submissions appear here automatically."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {newRecords.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setNotifOpen(true)}>
+                  View new records
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" disabled={!newRecords.length} onClick={markSeen}>
+                Mark all as read
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
+          <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>New attendance submissions</DialogTitle>
+              <DialogDescription>
+                {newRecords.length} record{newRecords.length === 1 ? "" : "s"} submitted since you last checked.
+              </DialogDescription>
+            </DialogHeader>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date Submitted</TableHead>
+                  <TableHead>Submitted By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {newRecords.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.teachers?.full_name}</TableCell>
+                    <TableCell>{r.departments?.name}</TableCell>
+                    <TableCell><Badge variant="secondary">{r.attendance_status}</Badge></TableCell>
+                    <TableCell>{r.date_submitted}</TableCell>
+                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <DialogFooter>
+              <Button onClick={() => { markSeen(); setNotifOpen(false); }}>Mark all as read</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Card>
+
           <CardHeader className="no-print">
             <CardTitle>Master Attendance Table</CardTitle>
             <CardDescription>
@@ -539,10 +666,35 @@ function HRModule() {
                 {[["Street", saProfile?.street], ["Barangay", saProfile?.barangay], ["City", saProfile?.city], ["Province", saProfile?.province]].map(([label, value]) => <div key={label}><dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-bold">{value || "—"}</dd></div>)}
               </dl>
             </section>
-            <DialogFooter><Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button></DialogFooter>
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button>
+              <Button variant="destructive" onClick={() => saView && setDeleteSa({ id: saView, name: saProfile?.full_name ?? "this Student Assistant" })}><Trash2 className="mr-2 h-4 w-4" />Delete SA Account</Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteSa} onOpenChange={(o) => !o && setDeleteSa(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteSa?.name}'s account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes their access to the system. All attendance records they
+              submitted stay in the master table exactly as recorded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeSa.isPending}
+              onClick={(e) => { e.preventDefault(); if (deleteSa) removeSa.mutate(deleteSa.id); }}
+            >
+              {removeSa.isPending ? "Deleting…" : "Delete Account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
