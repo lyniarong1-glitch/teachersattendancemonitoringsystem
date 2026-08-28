@@ -12,13 +12,7 @@ export function AppHeader({ name, role, userId, isSA = false }: { name: string; 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   async function signOut() { await queryClient.cancelQueries(); queryClient.clear(); await supabase.auth.signOut(); void navigate({ to: "/", replace: true }); }
-  const removeAccount = useMutation({
-    mutationFn: () => deleteMyAccount(),
-    onSuccess: async () => { await supabase.auth.signOut(); queryClient.clear(); toast.success("Your account has been deleted"); void navigate({ to: "/", replace: true }); },
-    onError: (error: Error) => toast.error(error.message),
-  });
   return <>
     <header className="no-print border-b border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="mx-auto flex min-h-16 max-w-[95rem] items-center justify-between gap-3 px-3 py-2 sm:px-4">
