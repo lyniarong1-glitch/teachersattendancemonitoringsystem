@@ -53,3 +53,32 @@ export const CLASS_SCHEDULES: string[] = [
   "Afternoon Session",
   "Evening Session",
 ];
+
+/** Exact local clock time (with seconds) — e.g. 2:07:35 PM */
+export function formatTimeExact(value?: string | null) {
+  if (!value) return "—";
+  const [h, m, s] = value.split(":");
+  const h24 = Number(h);
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${m}:${(s ?? "00").slice(0, 2)} ${h24 < 12 ? "AM" : "PM"}`;
+}
+
+/** Local date (YYYY-MM-DD) and time (HH:MM:SS) captured on the submitting device. */
+export function localSubmissionStamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return {
+    date_submitted: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time_submitted: `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
+  };
+}
+
+/** Readable full date, e.g. Friday, August 28, 2026 */
+export function formatDateLong(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+}
