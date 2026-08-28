@@ -45,13 +45,14 @@ export const Route = createFileRoute("/_authenticated/sa")({
       {
         name: "description",
         content:
-          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet — online or offline.",
+          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet.",
       },
       { property: "og:title", content: "Student Assistant Attendance Entry" },
       {
         property: "og:description",
-        content: "Record faculty attendance offline and sync it to the HR master table when back online.",
+        content: "Record faculty attendance and submit it directly to the HR master table.",
       },
+
     ],
   }),
   component: SAModule,
