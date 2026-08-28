@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/sa-history")({
       {
         name: "description",
         content:
-          "Review every attendance record you have saved and synced, grouped by the date it was submitted.",
+          "Review every attendance record you have submitted, grouped by the date it was submitted.",
       },
       { property: "og:title", content: "My Recent Submission History" },
       {
