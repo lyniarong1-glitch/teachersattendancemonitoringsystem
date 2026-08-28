@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Send } from "lucide-react";
+import { Search, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -258,7 +258,7 @@ function SAModule() {
                     </tr>
                   </thead>
                   <tbody>
-                    {teachers.map((t) => {
+                    {visibleTeachers.map((t) => {
                       const r = rows[t.id] ?? EMPTY_ROW;
                       return (
                         <tr key={t.id} className="align-top">
