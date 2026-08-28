@@ -82,32 +82,17 @@ function SAModule() {
   const [departmentId, setDepartmentId] = useState("");
   const [search, setSearch] = useState("");
   const [drafts, setDrafts] = useState<DraftsByDepartment>({});
-  const [pending, setPending] = useState<PendingRecord[]>([]);
-  const [online, setOnline] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const hydratedFor = useRef<string | null>(null);
 
   const getRow = (t: Teacher): RowState => drafts[t.department_id]?.[t.id] ?? EMPTY_ROW;
 
-  // Load locally-saved drafts + pending queue once the user is known.
+  // Load locally-saved drafts once the user is known.
   useEffect(() => {
     if (!user || hydratedFor.current === user.id) return;
     hydratedFor.current = user.id;
     setDrafts(loadDrafts(user.id));
-    setPending(loadQueue(user.id));
   }, [user]);
 
-  useEffect(() => {
-    setOnline(navigator.onLine);
-    const up = () => setOnline(true);
-    const down = () => setOnline(false);
-    window.addEventListener("online", up);
-    window.addEventListener("offline", down);
-    return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
-    };
-  }, []);
 
   const setRow = (deptId: string, id: string, patch: Partial<RowState>) => {
     if (!deptId) return;
