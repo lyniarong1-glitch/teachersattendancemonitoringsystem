@@ -449,7 +449,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.room_assignment}
-                              onValueChange={(v) => setRow(t.id, { room_assignment: v === "__clear__" ? "" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { room_assignment: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
                               <SelectContent className="max-h-72">
@@ -463,7 +463,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.time_arrival}
-                              onValueChange={(v) => setRow(t.id, { time_arrival: v === "__clear__" ? "" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { time_arrival: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent className="max-h-72">
@@ -477,7 +477,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.time_out}
-                              onValueChange={(v) => setRow(t.id, { time_out: v === "__clear__" ? "" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { time_out: v === "__clear__" ? "" : v })}
                             >
                               <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent className="max-h-72">
@@ -494,7 +494,7 @@ function SAModule() {
                                 aria-label={`${s} — ${t.full_name}`}
                                 checked={r.attendance_status === s}
                                 onCheckedChange={(c) =>
-                                  setRow(t.id, { attendance_status: c ? s : "" })
+                                  setRow(t.department_id, t.id, { attendance_status: c ? s : "" })
                                 }
                               />
                             </td>
@@ -502,7 +502,7 @@ function SAModule() {
                           <td className="border border-border p-1">
                             <Select
                               value={r.remarks}
-                              onValueChange={(v) => setRow(t.id, { remarks: v === "__clear__" ? "None" : v })}
+                              onValueChange={(v) => setRow(t.department_id, t.id, { remarks: v === "__clear__" ? "None" : v })}
                             >
                               <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
                               <SelectContent>
@@ -517,7 +517,7 @@ function SAModule() {
                                 className="mt-1 h-9 w-44"
                                 maxLength={200}
                                 value={r.other_remark}
-                                onChange={(e) => setRow(t.id, { other_remark: e.target.value })}
+                                onChange={(e) => setRow(t.department_id, t.id, { other_remark: e.target.value })}
                                 placeholder="Specify remark"
                               />
                             )}
