@@ -116,21 +116,24 @@ function SAHistory() {
           <CardHeader>
             <CardTitle>My Recent History</CardTitle>
             <CardDescription>
-              {rows.length} submitted record{rows.length === 1 ? "" : "s"} in {groups.length} date
-              group{groups.length === 1 ? "" : "s"}.
+              {rows.length} submitted record{rows.length === 1 ? "" : "s"} in {batches.length}{" "}
+              submission{batches.length === 1 ? "" : "s"} — newest first, each submission kept
+              separate.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoading && <p className="text-muted-foreground">Loading your history…</p>}
-            {!isLoading && groups.length === 0 && (
+            {!isLoading && batches.length === 0 && (
               <p className="text-muted-foreground">No records submitted yet.</p>
             )}
 
-            {visible.map(([date, group]) => (
-              <section key={date} className="space-y-2">
+            {visible.map(({ key, group, date, time }) => (
+              <section key={key} className="space-y-2">
                 <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                  Date Submitted: {date} · {group.length} record{group.length === 1 ? "" : "s"}
+                  Date Submitted: {date} · {formatTime(time?.slice(0, 5))} · {group.length} record
+                  {group.length === 1 ? "" : "s"}
                 </div>
+
                 <div className="overflow-x-auto rounded-md border border-border">
                   <table className="w-full min-w-[900px] border-collapse text-sm">
                     <thead>
