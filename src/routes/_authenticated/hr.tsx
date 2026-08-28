@@ -541,7 +541,8 @@ function HRModule() {
                   </Table>
                 </div>
               </section>
-            ))}
+              );
+            })}
 
             {groups.length > 0 && (
               <div className="no-print flex items-center justify-between gap-3 pt-2">
