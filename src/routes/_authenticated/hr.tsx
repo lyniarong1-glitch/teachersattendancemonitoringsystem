@@ -383,45 +383,46 @@ function HRModule() {
             )}
           </CardHeader>
           <CardContent className="space-y-2">
-            {notifications.length === 0 && (
-              <p className="text-sm text-muted-foreground">No submissions yet.</p>
+            {unreadCount === 0 && (
+              <p className="text-sm text-muted-foreground">No new submissions to review.</p>
             )}
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setBatchView(n);
-                  if (!n.read_at) markRead.mutate(n.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
+            {notifications
+              .filter((n) => !n.read_at)
+              .map((n) => (
+                <div
+                  key={n.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
                     setBatchView(n);
-                    if (!n.read_at) markRead.mutate(n.id);
-                  }
-                }}
-                className={`flex cursor-pointer flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm transition hover:border-primary hover:bg-secondary/60 ${n.read_at ? "opacity-60" : "bg-secondary/40 font-medium"}`}
-              >
-                <span>
-                  <button
-                    className="underline underline-offset-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSaView(n.submitted_by);
-                    }}
-                  >
-                    {n.submitted_by_name ?? "Student Assistant"}
-                  </button>{" "}
-                  submitted {n.record_count} attendance record
-                  {n.record_count === 1 ? "" : "s"}
-                  {n.department_name ? ` for ${n.department_name}` : ""} on{" "}
-                  {new Date(n.submitted_at).toLocaleString()}
-                </span>
-                <span className="flex items-center gap-2">
-                  <Badge variant="outline">Click to review</Badge>
-                  {!n.read_at && (
+                    markRead.mutate(n.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setBatchView(n);
+                      markRead.mutate(n.id);
+                    }
+                  }}
+                  className="flex cursor-pointer flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm font-medium transition hover:border-primary hover:bg-secondary/60"
+                >
+                  <span>
+                    <button
+                      className="underline underline-offset-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSaView(n.submitted_by);
+                      }}
+                    >
+                      {n.submitted_by_name ?? "Student Assistant"}
+                    </button>{" "}
+                    submitted {n.record_count} attendance record
+                    {n.record_count === 1 ? "" : "s"}
+                    {n.department_name ? ` for ${n.department_name}` : ""} on{" "}
+                    {new Date(n.submitted_at).toLocaleString()}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Badge variant="outline">Click to review</Badge>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -432,10 +433,9 @@ function HRModule() {
                     >
                       Mark read
                     </Button>
-                  )}
-                </span>
-              </div>
-            ))}
+                  </span>
+                </div>
+              ))}
           </CardContent>
         </Card>
         <Card>
