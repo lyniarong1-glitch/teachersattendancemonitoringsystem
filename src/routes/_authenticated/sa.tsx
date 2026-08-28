@@ -199,6 +199,17 @@ function SAModule() {
 
   const deptName = (id: string) => departments.find((d) => d.id === id)?.name ?? "";
 
+  const historyGroups = useMemo(() => {
+    const map = new Map<string, typeof mine>();
+    for (const r of mine) {
+      const list = map.get(r.date_submitted);
+      if (list) list.push(r);
+      else map.set(r.date_submitted, [r]);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [mine]);
+
+
   const pushToServer = useCallback(
     async (records: PendingRecord[]) => {
       const payload = records.map((r) => ({
