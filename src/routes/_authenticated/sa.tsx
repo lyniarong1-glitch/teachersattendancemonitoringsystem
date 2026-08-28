@@ -169,16 +169,31 @@ function SAModule() {
     return teachers.filter((t) => t.department_id === departmentId);
   }, [teachers, search, departmentId]);
 
+  // Pagination over the visible roster (drafts are kept per teacher, never per page).
+  const TEACHERS_PER_PAGE = 10;
+  const [rosterPage, setRosterPage] = useState(1);
+  const totalRosterPages = Math.max(1, Math.ceil(visibleTeachers.length / TEACHERS_PER_PAGE));
+  const currentRosterPage = Math.min(rosterPage, totalRosterPages);
+  const pagedTeachers = useMemo(
+    () =>
+      visibleTeachers.slice(
+        (currentRosterPage - 1) * TEACHERS_PER_PAGE,
+        currentRosterPage * TEACHERS_PER_PAGE,
+      ),
+    [visibleTeachers, currentRosterPage],
+  );
+
   // Grouped by department so the sheet mirrors the printed roster format.
   const teacherGroups = useMemo(() => {
     const map = new Map<string, Teacher[]>();
-    for (const t of visibleTeachers) {
+    for (const t of pagedTeachers) {
       const list = map.get(t.department_id);
       if (list) list.push(t);
       else map.set(t.department_id, [t]);
     }
     return [...map.entries()];
-  }, [visibleTeachers]);
+  }, [pagedTeachers]);
+
 
 
   const isComplete = (r?: RowState) => {
