@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  Bell,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -11,11 +10,9 @@ import {
   Pencil,
   Printer,
   Search,
-  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteStudentAssistant } from "@/lib/account.functions";
 import { useSession } from "@/hooks/use-session";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -25,16 +22,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -51,7 +38,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
 import {
   Select,
   SelectContent,
@@ -88,7 +74,6 @@ export const Route = createFileRoute("/_authenticated/hr")({
 
 type RecordRow = {
   id: string;
-  created_at: string;
   room_assignment: string;
   time_arrival: string | null;
   time_out: string | null;
@@ -100,23 +85,12 @@ type RecordRow = {
   teacher_id: string;
   department_id: string;
   submitted_by: string | null;
-  submitted_by_name: string | null;
-  submitted_by_id_number: string | null;
   teachers: { full_name: string } | null;
   departments: { name: string } | null;
   profiles: { full_name: string } | null;
 };
 
-/** Name of the SA who submitted a record. The snapshot stored at submission
- *  time wins, so the record always shows exactly who submitted it — even if the
- *  profile was later renamed or the account was deleted. */
-function submitterName(r: RecordRow) {
-  return r.submitted_by_name ?? r.profiles?.full_name ?? "—";
-}
-
 const DATES_PER_PAGE = 3;
-const SEEN_KEY = "tams:hr:records-seen-at";
-
 
 function statusVariant(s: RecordRow["attendance_status"]) {
   return s === "Present" ? "default" : s === "Late" ? "secondary" : "destructive";
@@ -131,21 +105,6 @@ function HRModule() {
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
   const [saView, setSaView] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const [seenAt, setSeenAt] = useState<string | null>(null);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [deleteSa, setDeleteSa] = useState<{ id: string; name: string } | null>(null);
-  const [saListOpen, setSaListOpen] = useState(false);
-
-  useEffect(() => {
-    setSeenAt(window.localStorage.getItem(SEEN_KEY) ?? new Date(0).toISOString());
-  }, []);
-
-  const markSeen = () => {
-    const now = new Date().toISOString();
-    window.localStorage.setItem(SEEN_KEY, now);
-    setSeenAt(now);
-  };
-
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -158,52 +117,15 @@ function HRModule() {
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["all-records"],
-    refetchInterval: 30000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, created_at, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, submitted_by_name, submitted_by_id_number, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as unknown as RecordRow[];
-    },
-  });
-
-
-  // New submissions appear on this page as soon as they reach the server.
-  useEffect(() => {
-    const channel = supabase
-      .channel("hr-attendance-feed")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "attendance_records" },
-        () => void queryClient.invalidateQueries({ queryKey: ["all-records"] }),
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const { data: studentAssistants = [] } = useQuery({
-    queryKey: ["registered-sas"],
-    queryFn: async () => {
-      const { data: roles, error: roleError } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "student_assistant");
-      if (roleError) throw roleError;
-      const ids = (roles ?? []).map((r) => r.user_id);
-      if (!ids.length) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, id_number, email, mobile_number, course, course_year, grade_level, class_schedule")
-        .in("id", ids)
-        .order("full_name");
-      if (error) throw error;
-      return data;
     },
   });
 
@@ -267,24 +189,6 @@ function HRModule() {
       );
   }, [records, teacherView]);
 
-  const newRecords = useMemo(
-    () => (seenAt ? records.filter((r) => r.created_at > seenAt) : []),
-    [records, seenAt],
-  );
-
-  const removeSa = useMutation({
-    mutationFn: (userId: string) => deleteStudentAssistant({ data: { userId } }),
-    onSuccess: () => {
-      setDeleteSa(null);
-      setSaView(null);
-      void queryClient.invalidateQueries({ queryKey: ["all-records"] });
-      void queryClient.invalidateQueries({ queryKey: ["registered-sas"] });
-      toast.success("Student Assistant account deleted");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
       if (!user) throw new Error("Not signed in");
@@ -324,7 +228,7 @@ function HRModule() {
       r.attendance_status,
       r.remarks ?? "",
       formatTime(r.time_submitted?.slice(0, 5)),
-      submitterName(r) === "—" ? "" : submitterName(r),
+      r.profiles?.full_name ?? "",
       r.last_edited_at ? new Date(r.last_edited_at).toLocaleString() : "",
     ]);
     const csv = [header, ...body]
@@ -352,86 +256,9 @@ function HRModule() {
 
   return (
     <div className="min-h-screen campus-bg">
-      <AppHeader name={fullName} role="Human Resources" userId={user?.id} onViewStudentAssistants={() => setSaListOpen(true)} />
+      <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
-        <Card className={`no-print border-l-4 ${newRecords.length ? "border-l-primary" : "border-l-muted"}`}>
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-            <div className="flex items-center gap-3">
-              <span className="relative">
-                <Bell className={`h-5 w-5 ${newRecords.length ? "text-primary" : "text-muted-foreground"}`} />
-                {newRecords.length > 0 && (
-                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-                    {newRecords.length > 99 ? "99+" : newRecords.length}
-                  </span>
-                )}
-              </span>
-              <div>
-                <p className="font-bold">
-                  {newRecords.length
-                    ? `${newRecords.length} new attendance record${newRecords.length === 1 ? "" : "s"} submitted`
-                    : "No new attendance records"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {newRecords.length
-                    ? newRecords
-                        .slice(0, 3)
-                        .map((r) => `${r.teachers?.full_name ?? "Teacher"} by ${submitterName(r)}`)
-                        .join(" · ")
-                    : "You're up to date. New submissions appear here automatically."}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {newRecords.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => setNotifOpen(true)}>
-                  View new records
-                </Button>
-              )}
-              <Button size="sm" variant="secondary" disabled={!newRecords.length} onClick={markSeen}>
-                Mark all as read
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
-          <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>New attendance submissions</DialogTitle>
-              <DialogDescription>
-                {newRecords.length} record{newRecords.length === 1 ? "" : "s"} submitted since you last checked.
-              </DialogDescription>
-            </DialogHeader>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Teacher</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date Submitted</TableHead>
-                  <TableHead>Submitted By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {newRecords.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.teachers?.full_name}</TableCell>
-                    <TableCell>{r.departments?.name}</TableCell>
-                    <TableCell><Badge variant="secondary">{r.attendance_status}</Badge></TableCell>
-                    <TableCell>{r.date_submitted}</TableCell>
-                    <TableCell>{submitterName(r)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <DialogFooter>
-              <Button onClick={() => { markSeen(); setNotifOpen(false); }}>Mark all as read</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         <Card>
-
           <CardHeader className="no-print">
             <CardTitle>Master Attendance Table</CardTitle>
             <CardDescription>
@@ -553,23 +380,16 @@ function HRModule() {
                           </TableCell>
                           <TableCell>{formatTime(r.time_submitted?.slice(0, 5))}</TableCell>
                           <TableCell>
-                            {r.submitted_by && r.profiles?.full_name ? (
+                            {r.submitted_by ? (
                               <button
                                 type="button"
                                 className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
                                 onClick={() => setSaView(r.submitted_by)}
                               >
-                                {r.profiles.full_name}
+                                {r.profiles?.full_name ?? "Student Assistant"}
                               </button>
                             ) : (
-                              <span className="font-bold">
-                                {submitterName(r)}
-                                {r.submitted_by_name && !r.profiles?.full_name && (
-                                  <span className="block text-xs font-normal text-muted-foreground">
-                                    account deleted
-                                  </span>
-                                )}
-                              </span>
+                              "—"
                             )}
                           </TableCell>
                           <TableCell className="no-print">
@@ -666,7 +486,7 @@ function HRModule() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{submitterName(r)}</TableCell>
+                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
                         <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
@@ -719,102 +539,10 @@ function HRModule() {
                 {[["Street", saProfile?.street], ["Barangay", saProfile?.barangay], ["City", saProfile?.city], ["Province", saProfile?.province]].map(([label, value]) => <div key={label}><dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-bold">{value || "—"}</dd></div>)}
               </dl>
             </section>
-            <DialogFooter className="gap-2 sm:justify-between">
-              <Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button>
-              <Button variant="destructive" onClick={() => saView && setDeleteSa({ id: saView, name: saProfile?.full_name ?? "this Student Assistant" })}><Trash2 className="mr-2 h-4 w-4" />Delete SA Account</Button>
-            </DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button></DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={saListOpen} onOpenChange={setSaListOpen}>
-        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Registered Student Assistants</DialogTitle>
-            <DialogDescription>
-              {studentAssistants.length} registered account
-              {studentAssistants.length === 1 ? "" : "s"}. Open a profile for full details, or
-              delete an account — submitted attendance records are always preserved.
-            </DialogDescription>
-          </DialogHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Full Name</TableHead>
-                <TableHead>ID Number</TableHead>
-                <TableHead>Course / Year</TableHead>
-                <TableHead>Class Schedule</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {studentAssistants.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No Student Assistant accounts registered yet.
-                  </TableCell>
-                </TableRow>
-              )}
-              {studentAssistants.map((sa) => (
-                <TableRow key={sa.id}>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
-                      onClick={() => { setSaListOpen(false); setSaView(sa.id); }}
-                    >
-                      {sa.full_name}
-                    </button>
-                  </TableCell>
-                  <TableCell>{sa.id_number || "—"}</TableCell>
-                  <TableCell>{[sa.grade_level, sa.course ?? sa.course_year].filter(Boolean).join(" · ") || "—"}</TableCell>
-                  <TableCell>{sa.class_schedule || "—"}</TableCell>
-                  <TableCell className="break-all">{sa.email}</TableCell>
-                  <TableCell>{sa.mobile_number || "—"}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setDeleteSa({ id: sa.id, name: sa.full_name })}
-                    >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSaListOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-
-
-      <AlertDialog open={!!deleteSa} onOpenChange={(o) => !o && setDeleteSa(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteSa?.name}'s account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes their access to the system. All attendance records they
-              submitted stay in the master table exactly as recorded.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={removeSa.isPending}
-              onClick={(e) => { e.preventDefault(); if (deleteSa) removeSa.mutate(deleteSa.id); }}
-            >
-              {removeSa.isPending ? "Deleting…" : "Delete Account"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>

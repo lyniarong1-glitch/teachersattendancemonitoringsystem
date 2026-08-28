@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Send } from "lucide-react";
+import { CloudOff, RefreshCw, Search, Send, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -24,19 +25,22 @@ import {
   REMARKS_OPTIONS,
   STATUS_OPTIONS,
   TIME_SLOTS,
+  formatTime,
 } from "@/lib/attendance-constants";
-
 import {
   cacheGet,
   cacheSet,
+  dequeue,
+  enqueue,
   loadDrafts,
+  loadQueue,
   localDateTime,
   newClientUuid,
   saveDrafts,
   type DraftsByDepartment,
   type OfflineRow,
+  type PendingRecord,
 } from "@/lib/offline-store";
-
 
 export const Route = createFileRoute("/_authenticated/sa")({
   head: () => ({
@@ -45,14 +49,13 @@ export const Route = createFileRoute("/_authenticated/sa")({
       {
         name: "description",
         content:
-          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet.",
+          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet — online or offline.",
       },
       { property: "og:title", content: "Student Assistant Attendance Entry" },
       {
         property: "og:description",
-        content: "Record faculty attendance and submit it directly to the HR master table.",
+        content: "Record faculty attendance offline and sync it to the HR master table when back online.",
       },
-
     ],
   }),
   component: SAModule,
@@ -70,8 +73,7 @@ const EMPTY_ROW: RowState = {
 };
 
 type Dept = { id: string; name: string };
-type Teacher = { id: string; full_name: string; department_id: string };
-
+type Teacher = { id: string; full_name: string };
 
 function SAModule() {
   const { user, role, fullName } = useSession();
@@ -79,29 +81,43 @@ function SAModule() {
   const [departmentId, setDepartmentId] = useState("");
   const [search, setSearch] = useState("");
   const [drafts, setDrafts] = useState<DraftsByDepartment>({});
+  const [pending, setPending] = useState<PendingRecord[]>([]);
+  const [online, setOnline] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const hydratedFor = useRef<string | null>(null);
 
-  const getRow = (t: Teacher): RowState => drafts[t.department_id]?.[t.id] ?? EMPTY_ROW;
+  const rows = drafts[departmentId] ?? {};
 
-  // Load locally-saved drafts once the user is known.
+  // Load locally-saved drafts + pending queue once the user is known.
   useEffect(() => {
     if (!user || hydratedFor.current === user.id) return;
     hydratedFor.current = user.id;
     setDrafts(loadDrafts(user.id));
+    setPending(loadQueue(user.id));
   }, [user]);
 
+  useEffect(() => {
+    setOnline(navigator.onLine);
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
 
-  const setRow = (deptId: string, id: string, patch: Partial<RowState>) => {
-    if (!deptId) return;
+  const setRow = (id: string, patch: Partial<RowState>) => {
+    if (!departmentId) return;
     setDrafts((prev) => {
-      const dept = { ...(prev[deptId] ?? {}) };
+      const dept = { ...(prev[departmentId] ?? {}) };
       dept[id] = { ...EMPTY_ROW, ...dept[id], ...patch };
-      const next = { ...prev, [deptId]: dept };
+      const next = { ...prev, [departmentId]: dept };
       if (user) saveDrafts(user.id, next);
       return next;
     });
   };
-
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -121,47 +137,49 @@ function SAModule() {
   });
 
   const { data: teachers = [] } = useQuery({
-    queryKey: ["teachers", "all"],
+    queryKey: ["teachers", departmentId],
+    enabled: !!departmentId,
     queryFn: async () => {
       try {
         const { data, error } = await supabase
           .from("teachers")
-          .select("id, full_name, department_id")
+          .select("id, full_name")
+          .eq("department_id", departmentId)
           .order("full_name");
         if (error) throw error;
-        cacheSet("teachers:all", data);
+        cacheSet(`teachers:${departmentId}`, data);
         return data as Teacher[];
       } catch (e) {
-        const cached = cacheGet<Teacher[]>("teachers:all");
+        const cached = cacheGet<Teacher[]>(`teachers:${departmentId}`);
         if (cached) return cached;
         throw e;
       }
     },
-    initialData: () => cacheGet<Teacher[]>("teachers:all") ?? undefined,
+    initialData: () =>
+      departmentId ? (cacheGet<Teacher[]>(`teachers:${departmentId}`) ?? undefined) : undefined,
   });
 
+  const { data: mine = [] } = useQuery({
+    queryKey: ["my-records", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .select(
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
+        )
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
 
-
-
-  // Search works across every department, even before one is selected.
   const visibleTeachers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (q) return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
-    if (!departmentId) return teachers;
-    return teachers.filter((t) => t.department_id === departmentId);
-  }, [teachers, search, departmentId]);
-
-  // Grouped by department so the sheet mirrors the printed roster format.
-  const teacherGroups = useMemo(() => {
-    const map = new Map<string, Teacher[]>();
-    for (const t of visibleTeachers) {
-      const list = map.get(t.department_id);
-      if (list) list.push(t);
-      else map.set(t.department_id, [t]);
-    }
-    return [...map.entries()];
-  }, [visibleTeachers]);
-
+    if (!q) return teachers;
+    return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
+  }, [teachers, search]);
 
   const isComplete = (r?: RowState) => {
     if (!r) return false;
@@ -170,28 +188,84 @@ function SAModule() {
     return true;
   };
 
-  // Ready rows are computed from every department's saved drafts, never from the
-  // search view, so filtering or switching departments can never drop a record.
+  // Ready rows are computed from the full roster, never from the search view,
+  // so filtering can never drop a recorded row.
   const readyRows = useMemo(
-    () => teachers.filter((t) => isComplete(drafts[t.department_id]?.[t.id])),
-    [teachers, drafts],
+    () => teachers.filter((t) => isComplete(rows[t.id])),
+    [teachers, rows],
   );
 
+  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
-  const deptName = (id: string) => departments.find((d) => d.id === id)?.name ?? "";
+  const pushToServer = useCallback(
+    async (records: PendingRecord[]) => {
+      const payload = records.map((r) => ({
+        client_uuid: r.client_uuid,
+        teacher_id: r.teacher_id,
+        department_id: r.department_id,
+        submitted_by: r.submitted_by,
+        room_assignment: r.room_assignment,
+        time_arrival: r.time_arrival,
+        time_out: r.time_out,
+        attendance_status: r.attendance_status,
+        remarks: r.remarks,
+        date_submitted: r.date_submitted,
+        time_submitted: r.time_submitted,
+      }));
+      // Duplicate-safe: the server ignores records whose client reference already exists.
+      const { error } = await supabase
+        .from("attendance_records")
+        .upsert(payload, { onConflict: "client_uuid", ignoreDuplicates: true });
+      if (error) throw error;
+    },
+    [],
+  );
 
+  const syncPending = useCallback(
+    async (silent = false) => {
+      if (!user) return;
+      const queue = loadQueue(user.id);
+      if (queue.length === 0) {
+        if (!silent) toast.info("Nothing to sync — all records are already submitted.");
+        return;
+      }
+      if (!navigator.onLine) {
+        if (!silent) toast.error("Still offline. Your records stay saved on this device.");
+        return;
+      }
+      setSyncing(true);
+      try {
+        await pushToServer(queue);
+        setPending(dequeue(user.id, queue.map((r) => r.client_uuid)));
+        void queryClient.invalidateQueries({ queryKey: ["my-records"] });
+        toast.success(`${queue.length} saved record${queue.length === 1 ? "" : "s"} synced`);
+      } catch (e) {
+        if (!silent) toast.error(`Sync failed: ${(e as Error).message}. Records are still saved locally.`);
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [user, pushToServer, queryClient],
+  );
 
+  // Auto-sync as soon as the connection comes back.
+  useEffect(() => {
+    if (online && pending.length > 0) void syncPending(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
       const stamp = localDateTime();
-      const records = readyRows.map((t) => {
-        const r = drafts[t.department_id]![t.id]!;
+      const records: PendingRecord[] = readyRows.map((t) => {
+        const r = rows[t.id]!;
         return {
           client_uuid: newClientUuid(),
           teacher_id: t.id,
-          department_id: t.department_id,
+          teacher_name: t.full_name,
+          department_id: departmentId,
+          department_name: departmentName,
           submitted_by: user.id,
           room_assignment: r.room_assignment,
           time_arrival: r.time_arrival || null,
@@ -199,61 +273,45 @@ function SAModule() {
           attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
           remarks: r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
           ...stamp,
+          saved_at: new Date().toISOString(),
         };
       });
       if (records.length === 0) throw new Error("No completed rows to submit");
 
-      // Each submission carries a fresh client reference, so a plain insert is
-      // duplicate-safe. Large rosters are sent in batches so hundreds of rows
-      // all reach HR instead of failing on one oversized request.
-      const CHUNK = 100;
-      const confirmed: { client_uuid: string | null; teacher_id: string; department_id: string }[] = [];
-      let failure: Error | null = null;
-      for (let i = 0; i < records.length; i += CHUNK) {
-        const batch = records.slice(i, i + CHUNK);
-        const { data: saved, error } = await supabase
-          .from("attendance_records")
-          .insert(batch)
-          .select("client_uuid, teacher_id, department_id");
-        if (error) {
-          failure = new Error(error.message);
-          break;
-        }
-        confirmed.push(...(saved ?? []));
-      }
-
-      if (confirmed.length === 0) {
-        throw failure ?? new Error("Submission could not be confirmed — nothing was cleared");
-      }
-
-      // Clear every row confirmed saved, across all departments.
+      // Always persist locally first so nothing can be lost.
+      const queue = enqueue(user.id, records);
+      setPending(queue);
+      // Clear only the rows that were captured into the queue.
       setDrafts((prev) => {
-        const next: DraftsByDepartment = { ...prev };
-        for (const r of confirmed) {
-          const dept = { ...(next[r.department_id] ?? {}) };
-          delete dept[r.teacher_id];
-          next[r.department_id] = dept;
-        }
+        const dept = { ...(prev[departmentId] ?? {}) };
+        for (const r of records) delete dept[r.teacher_id];
+        const next = { ...prev, [departmentId]: dept };
         saveDrafts(user.id, next);
         return next;
       });
 
-      if (failure) {
-        throw new Error(
-          `${confirmed.length} of ${records.length} records submitted. ${failure.message}`,
-        );
+      if (!navigator.onLine) return { count: records.length, offline: true };
+
+      try {
+        await pushToServer(records);
+        setPending(dequeue(user.id, records.map((r) => r.client_uuid)));
+        return { count: records.length, offline: false };
+      } catch {
+        return { count: records.length, offline: true };
       }
-
-      return { count: confirmed.length };
-
     },
-    onSuccess: ({ count }) => {
+    onSuccess: ({ count, offline }) => {
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted to HR`);
+      if (offline) {
+        toast.success(
+          `${count} record${count === 1 ? "" : "s"} saved on this device — they will sync when you're back online.`,
+        );
+      } else {
+        toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
 
   if (role && role !== "student_assistant") {
     return (
@@ -270,22 +328,38 @@ function SAModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant={online ? "secondary" : "destructive"} className="gap-1">
+            {online ? <Wifi className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+            {online ? "Online" : "Offline mode"}
+          </Badge>
+          {pending.length > 0 && (
+            <>
+              <Badge variant="outline">
+                {pending.length} record{pending.length === 1 ? "" : "s"} saved on this device
+              </Badge>
+              <Button size="sm" variant="outline" disabled={syncing} onClick={() => void syncPending()}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing…" : "Sync now"}
+              </Button>
+            </>
+          )}
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Completed rows are submitted straight to HR exactly as you recorded them.
+              Pick a department, fill in the rows you observed, then submit. Entries are saved on this
+              device automatically — you can work offline and switch departments without losing them.
             </CardDescription>
           </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
-                <Label className="whitespace-nowrap uppercase">Select Department:</Label>
+          <CardContent className="space-y-5">
+            <div className="flex flex-wrap gap-4">
+              <div className="w-full max-w-xs space-y-2">
+                <Label>Department</Label>
                 <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
-                  <SelectTrigger className="h-9 w-48 border-0 shadow-none focus:ring-0">
-                    <SelectValue placeholder="All departments" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
                   <SelectContent>
                     {departments.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -293,176 +367,269 @@ function SAModule() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
-                <Label htmlFor="teacher-search" className="whitespace-nowrap uppercase">
-                  Search Teachers Name:
-                </Label>
+              <div className="w-full max-w-xs space-y-2">
+                <Label htmlFor="teacher-search">Search teacher</Label>
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="teacher-search"
-                    className="h-9 w-48 border-0 pl-8 shadow-none focus-visible:ring-0"
+                    className="pl-9"
                     placeholder="Type a teacher's name"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    disabled={!departmentId}
                   />
                 </div>
               </div>
             </div>
 
-            {teacherGroups.length === 0 && (
-              <p className="text-muted-foreground">No teacher matches “{search}”.</p>
+            {departmentId && (
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full min-w-[1000px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-secondary/60">
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Teacher's Name
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Room Assigned
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Time In
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Time Out
+                      </th>
+                      <th colSpan={3} className="border border-border px-3 py-2 text-center">
+                        Attendance Status
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Remarks
+                      </th>
+                    </tr>
+                    <tr className="bg-secondary/60">
+                      {STATUS_OPTIONS.map((s) => (
+                        <th key={s} className="border border-border px-3 py-1 text-center w-12">
+                          {s[0]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleTeachers.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="border border-border px-3 py-6 text-center text-muted-foreground">
+                          No teacher matches “{search}”.
+                        </td>
+                      </tr>
+                    )}
+                    {visibleTeachers.map((t) => {
+                      const r = rows[t.id] ?? EMPTY_ROW;
+                      return (
+                        <tr key={t.id} className="align-top">
+                          <td className="border border-border px-3 py-2 font-medium">
+                            {t.full_name}
+                          </td>
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.room_assignment}
+                              onValueChange={(v) => setRow(t.id, { room_assignment: v === "__clear__" ? "" : v })}
+                            >
+                              <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                <SelectItem value="__clear__">Clear selection</SelectItem>
+                                {ROOMS.map((room) => (
+                                  <SelectItem key={room} value={room}>{room}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.time_arrival}
+                              onValueChange={(v) => setRow(t.id, { time_arrival: v === "__clear__" ? "" : v })}
+                            >
+                              <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                <SelectItem value="__clear__">Clear</SelectItem>
+                                {TIME_SLOTS.map((s) => (
+                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.time_out}
+                              onValueChange={(v) => setRow(t.id, { time_out: v === "__clear__" ? "" : v })}
+                            >
+                              <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                <SelectItem value="__clear__">Clear</SelectItem>
+                                {TIME_SLOTS.map((s) => (
+                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {STATUS_OPTIONS.map((s) => (
+                            <td key={s} className="border border-border p-1 text-center">
+                              <Checkbox
+                                aria-label={`${s} — ${t.full_name}`}
+                                checked={r.attendance_status === s}
+                                onCheckedChange={(c) =>
+                                  setRow(t.id, { attendance_status: c ? s : "" })
+                                }
+                              />
+                            </td>
+                          ))}
+                          <td className="border border-border p-1">
+                            <Select
+                              value={r.remarks}
+                              onValueChange={(v) => setRow(t.id, { remarks: v === "__clear__" ? "None" : v })}
+                            >
+                              <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__clear__">Clear selection</SelectItem>
+                                {REMARKS_OPTIONS.map((o) => (
+                                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {r.remarks === "Others" && (
+                              <Input
+                                className="mt-1 h-9 w-44"
+                                maxLength={200}
+                                value={r.other_remark}
+                                onChange={(e) => setRow(t.id, { other_remark: e.target.value })}
+                                placeholder="Specify remark"
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
 
-
-            {teacherGroups.map(([deptId, group]) => (
-              <section key={deptId} className="space-y-2">
-                <h2 className="text-base font-bold uppercase tracking-wide">{deptName(deptId)}</h2>
-                <div className="overflow-x-auto rounded-md border border-border">
-                  <table className="w-full min-w-[1000px] border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-secondary/60">
-                        <th rowSpan={2} className="border border-border px-3 py-2 text-center">
-                          TEACHERS NAME
-                        </th>
-                        <th rowSpan={2} className="border border-border px-3 py-2 text-center">
-                          ROOM ASSIGNED
-                        </th>
-                        <th rowSpan={2} className="border border-border px-3 py-2 text-center">
-                          TIME IN
-                        </th>
-                        <th rowSpan={2} className="border border-border px-3 py-2 text-center">
-                          TIME OUT
-                        </th>
-                        <th colSpan={3} className="border border-border px-3 py-2 text-center">
-                          ATTENDANCE STATUS
-                        </th>
-                        <th rowSpan={2} className="border border-border px-3 py-2 text-center">
-                          REMARKS
-                        </th>
-                      </tr>
-                      <tr className="bg-secondary/60">
-                        {STATUS_OPTIONS.map((s) => (
-                          <th key={s} className="w-12 border border-border px-3 py-1 text-center">
-                            {s[0]}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.map((t) => {
-                        const r = getRow(t);
-                        return (
-                          <tr key={t.id} className="align-top">
-                            <td className="border border-border px-3 py-2 font-medium">
-                              {t.full_name}
-                            </td>
-                            <td className="border border-border p-1">
-                              <Select
-                                value={r.room_assignment}
-                                onValueChange={(v) => setRow(t.department_id, t.id, { room_assignment: v === "__clear__" ? "" : v })}
-                              >
-                                <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
-                                <SelectContent className="max-h-72">
-                                  <SelectItem value="__clear__">Clear selection</SelectItem>
-                                  {ROOMS.map((room) => (
-                                    <SelectItem key={room} value={room}>{room}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            <td className="border border-border p-1">
-                              <Select
-                                value={r.time_arrival}
-                                onValueChange={(v) => setRow(t.department_id, t.id, { time_arrival: v === "__clear__" ? "" : v })}
-                              >
-                                <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
-                                <SelectContent className="max-h-72">
-                                  <SelectItem value="__clear__">Clear</SelectItem>
-                                  {TIME_SLOTS.map((s) => (
-                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            <td className="border border-border p-1">
-                              <Select
-                                value={r.time_out}
-                                onValueChange={(v) => setRow(t.department_id, t.id, { time_out: v === "__clear__" ? "" : v })}
-                              >
-                                <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
-                                <SelectContent className="max-h-72">
-                                  <SelectItem value="__clear__">Clear</SelectItem>
-                                  {TIME_SLOTS.map((s) => (
-                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            {STATUS_OPTIONS.map((s) => (
-                              <td key={s} className="border border-border p-1 text-center">
-                                <Checkbox
-                                  aria-label={`${s} — ${t.full_name}`}
-                                  checked={r.attendance_status === s}
-                                  onCheckedChange={(c) =>
-                                    setRow(t.department_id, t.id, { attendance_status: c ? s : "" })
-                                  }
-                                />
-                              </td>
-                            ))}
-                            <td className="border border-border p-1">
-                              <Select
-                                value={r.remarks}
-                                onValueChange={(v) => setRow(t.department_id, t.id, { remarks: v === "__clear__" ? "None" : v })}
-                              >
-                                <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__clear__">Clear selection</SelectItem>
-                                  {REMARKS_OPTIONS.map((o) => (
-                                    <SelectItem key={o} value={o}>{o}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {r.remarks === "Others" && (
-                                <Input
-                                  className="mt-1 h-9 w-44"
-                                  maxLength={200}
-                                  value={r.other_remark}
-                                  onChange={(e) => setRow(t.department_id, t.id, { other_remark: e.target.value })}
-                                  placeholder="Specify remark"
-                                />
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ))}
-
-
-            <div className="flex justify-start pt-2">
-              <Button
-                className="min-w-56"
-                disabled={readyRows.length === 0 || submit.isPending}
-                onClick={() => submit.mutate()}
-              >
-                <Send className="mr-2 h-4 w-4" />
-                {submit.isPending
-                  ? "Submitting to HR…"
-                  : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"} to HR`}
-              </Button>
-            </div>
-
+            <Button
+              className="w-full sm:w-auto"
+              disabled={readyRows.length === 0 || submit.isPending}
+              onClick={() => submit.mutate()}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {submit.isPending
+                ? "Submitting…"
+                : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
+            </Button>
           </CardContent>
         </Card>
 
+        {pending.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Saved on This Device (not yet synced)</CardTitle>
+              <CardDescription>
+                These records are kept exactly as you recorded them and will be sent to HR once synced.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full min-w-[900px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-secondary/60">
+                      <th className="border border-border px-3 py-2 text-left">Date Recorded</th>
+                      <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
+                      <th className="border border-border px-3 py-2 text-left">Department</th>
+                      <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
+                      <th className="border border-border px-3 py-2 text-left">Time In</th>
+                      <th className="border border-border px-3 py-2 text-left">Time Out</th>
+                      <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
+                      <th className="border border-border px-3 py-2 text-left">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pending.map((r) => (
+                      <tr key={r.client_uuid}>
+                        <td className="border border-border px-3 py-2">
+                          {r.date_submitted} {formatTime(r.time_submitted.slice(0, 5))}
+                        </td>
+                        <td className="border border-border px-3 py-2 font-medium">{r.teacher_name}</td>
+                        <td className="border border-border px-3 py-2">{r.department_name}</td>
+                        <td className="border border-border px-3 py-2">{r.room_assignment}</td>
+                        <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
+                        <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
+                        <td className="border border-border px-3 py-2">
+                          <Badge variant="secondary">{r.attendance_status}</Badge>
+                        </td>
+                        <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-
-
-
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">My Recent Submissions</CardTitle>
+            <CardDescription>Most recent submissions first.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full min-w-[900px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-secondary/60">
+                    <th className="border border-border px-3 py-2 text-left">Date Submitted</th>
+                    <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
+                    <th className="border border-border px-3 py-2 text-left">Department</th>
+                    <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
+                    <th className="border border-border px-3 py-2 text-left">Time In</th>
+                    <th className="border border-border px-3 py-2 text-left">Time Out</th>
+                    <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
+                    <th className="border border-border px-3 py-2 text-left">Remarks</th>
+                    <th className="border border-border px-3 py-2 text-left">Submitted By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mine.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="border border-border px-3 py-6 text-center text-muted-foreground"
+                      >
+                        No records submitted yet.
+                      </td>
+                    </tr>
+                  )}
+                  {mine.map((r) => (
+                    <tr key={r.id}>
+                      <td className="border border-border px-3 py-2">
+                        {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
+                      </td>
+                      <td className="border border-border px-3 py-2 font-medium">
+                        {r.teachers?.full_name}
+                      </td>
+                      <td className="border border-border px-3 py-2">{r.departments?.name}</td>
+                      <td className="border border-border px-3 py-2">{r.room_assignment}</td>
+                      <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
+                      <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
+                      <td className="border border-border px-3 py-2">
+                        <Badge variant="secondary">{r.attendance_status}</Badge>
+                      </td>
+                      <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
+                      <td className="border border-border px-3 py-2">{fullName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
       </main>
     </div>
