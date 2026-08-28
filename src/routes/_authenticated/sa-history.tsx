@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { AppHeader } from "@/components/AppHeader";
@@ -59,6 +59,16 @@ function SubmissionHistoryPage() {
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [mine]);
 
+  const GROUPS_PER_PAGE = 5;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(historyGroups.length / GROUPS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedGroups = historyGroups.slice(
+    (currentPage - 1) * GROUPS_PER_PAGE,
+    currentPage * GROUPS_PER_PAGE,
+  );
+
+
   return (
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
@@ -82,7 +92,7 @@ function SubmissionHistoryPage() {
             {!isLoading && mine.length === 0 && (
               <p className="text-muted-foreground">No records submitted yet.</p>
             )}
-            {historyGroups.map(([date, rowsForDate]) => (
+            {pagedGroups.map(([date, rowsForDate]) => (
               <section key={date} className="space-y-2">
                 <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
                   Date Submitted: {date} · {rowsForDate.length} record
@@ -128,6 +138,35 @@ function SubmissionHistoryPage() {
                 </div>
               </section>
             ))}
+
+            {historyGroups.length > 0 && totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="font-bold"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage(currentPage - 1)}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="font-bold"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage(currentPage + 1)}
+                  >
+                    Next
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
           </CardContent>
         </Card>
       </main>
