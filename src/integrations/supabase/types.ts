@@ -180,6 +180,50 @@ export type Database = {
         }
         Relationships: []
       }
+      submission_notifications: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          department_name: string | null
+          id: string
+          read_at: string | null
+          record_count: number
+          submitted_at: string
+          submitted_by: string | null
+          submitted_by_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          department_name?: string | null
+          id?: string
+          read_at?: string | null
+          record_count?: number
+          submitted_at?: string
+          submitted_by?: string | null
+          submitted_by_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          department_name?: string | null
+          id?: string
+          read_at?: string | null
+          record_count?: number
+          submitted_at?: string
+          submitted_by?: string | null
+          submitted_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_notifications_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teachers: {
         Row: {
           department_id: string
