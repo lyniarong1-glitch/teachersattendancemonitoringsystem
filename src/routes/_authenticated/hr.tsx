@@ -226,11 +226,14 @@ function HRModule() {
   }, [records, department, search]);
 
   const groups = useMemo(() => {
+    // One section per submission batch (date + exact time + submitter) so a new
+    // submission is never merged into an older one.
     const map = new Map<string, RecordRow[]>();
     for (const r of filtered) {
-      const list = map.get(r.date_submitted);
+      const key = `${r.date_submitted}|${r.time_submitted}|${r.submitted_by ?? "unknown"}`;
+      const list = map.get(key);
       if (list) list.push(r);
-      else map.set(r.date_submitted, [r]);
+      else map.set(key, [r]);
     }
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [filtered]);
@@ -392,8 +395,8 @@ function HRModule() {
           <CardHeader className="no-print">
             <CardTitle>Master Attendance Table</CardTitle>
             <CardDescription>
-              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length} date
-              section{groups.length === 1 ? "" : "s"}
+              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length}{" "}
+              submission batch{groups.length === 1 ? "" : "es"} — newest first, never merged
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -440,11 +443,16 @@ function HRModule() {
               </p>
             )}
 
-            {visibleGroups.map(([date, rows]) => (
-              <section key={date} className="space-y-2">
+            {visibleGroups.map(([key, rows]) => {
+              const date = key.split("|")[0]!;
+              const time = key.split("|")[1]!;
+              const submitter = rows[0]?.profiles?.full_name ?? "Unknown";
+              return (
+              <section key={key} className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                    Date Submitted: {date}
+                    Date Submitted: {date} · {formatTimeExact(time)} · {submitter} · {rows.length}{" "}
+                    record{rows.length === 1 ? "" : "s"}
                   </div>
                   <div className="no-print flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => exportCsv(date, rows)}>
@@ -533,7 +541,8 @@ function HRModule() {
                   </Table>
                 </div>
               </section>
-            ))}
+              );
+            })}
 
             {groups.length > 0 && (
               <div className="no-print flex items-center justify-between gap-3 pt-2">
