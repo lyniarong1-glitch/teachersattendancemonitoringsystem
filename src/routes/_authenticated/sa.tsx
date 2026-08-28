@@ -542,6 +542,34 @@ function SAModule() {
               </section>
             ))}
 
+            {totalRosterPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Page {currentRosterPage} of {totalRosterPages} · {visibleTeachers.length} teachers
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="font-bold"
+                    disabled={currentRosterPage <= 1}
+                    onClick={() => setRosterPage(currentRosterPage - 1)}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="font-bold"
+                    disabled={currentRosterPage >= totalRosterPages}
+                    onClick={() => setRosterPage(currentRosterPage + 1)}
+                  >
+                    Next
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
 
             <div className="flex justify-start pt-2">
               <Button
