@@ -204,17 +204,29 @@ function SAModule() {
       if (records.length === 0) throw new Error("No completed rows to submit");
 
       // Each submission carries a fresh client reference, so a plain insert is
-      // duplicate-safe and returns exactly what the server stored.
-      const { data: saved, error } = await supabase
-        .from("attendance_records")
-        .insert(records)
-        .select("client_uuid, teacher_id, department_id");
-      if (error) throw error;
+      // duplicate-safe. Large rosters are sent in batches so hundreds of rows
+      // all reach HR instead of failing on one oversized request.
+      const CHUNK = 100;
+      const confirmed: { client_uuid: string | null; teacher_id: string; department_id: string }[] = [];
+      let failure: Error | null = null;
+      for (let i = 0; i < records.length; i += CHUNK) {
+        const batch = records.slice(i, i + CHUNK);
+        const { data: saved, error } = await supabase
+          .from("attendance_records")
+          .insert(batch)
+          .select("client_uuid, teacher_id, department_id");
+        if (error) {
+          failure = new Error(error.message);
+          break;
+        }
+        confirmed.push(...(saved ?? []));
+      }
 
-      const confirmed = saved ?? [];
-      if (confirmed.length === 0) throw new Error("Submission could not be confirmed — nothing was cleared");
+      if (confirmed.length === 0) {
+        throw failure ?? new Error("Submission could not be confirmed — nothing was cleared");
+      }
 
-      // Clear only the rows confirmed saved, in every department.
+      // Clear every row confirmed saved, across all departments.
       setDrafts((prev) => {
         const next: DraftsByDepartment = { ...prev };
         for (const r of confirmed) {
@@ -226,7 +238,14 @@ function SAModule() {
         return next;
       });
 
+      if (failure) {
+        throw new Error(
+          `${confirmed.length} of ${records.length} records submitted. ${failure.message}`,
+        );
+      }
+
       return { count: confirmed.length };
+
     },
     onSuccess: ({ count }) => {
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
