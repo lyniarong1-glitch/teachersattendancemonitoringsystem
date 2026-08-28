@@ -158,21 +158,8 @@ function SAModule() {
     initialData: () => cacheGet<Teacher[]>("teachers:all") ?? undefined,
   });
 
-  const { data: mine = [] } = useQuery({
-    queryKey: ["my-records", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
-        )
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      return data;
-    },
-  });
+
+
 
   // Search works across every department, even before one is selected.
   const visibleTeachers = useMemo(() => {
