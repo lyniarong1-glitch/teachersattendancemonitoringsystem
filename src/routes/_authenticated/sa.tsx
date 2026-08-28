@@ -391,17 +391,21 @@ function SAModule() {
             </div>
 
 
-            {departmentId && (
+            {(departmentId || search.trim()) && (
               <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full min-w-[1000px] border-collapse text-sm">
+                <table className="w-full min-w-[1100px] border-collapse text-sm">
                   <thead>
                     <tr className="bg-secondary/60">
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Teacher's Name
                       </th>
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                        Department
+                      </th>
+                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Room Assigned
                       </th>
+
                       <th rowSpan={2} className="border border-border px-3 py-2 text-left">
                         Time In
                       </th>
