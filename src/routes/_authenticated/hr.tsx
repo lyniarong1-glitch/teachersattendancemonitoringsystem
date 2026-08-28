@@ -108,6 +108,20 @@ function HRModule() {
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
   const [saView, setSaView] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [seenAt, setSeenAt] = useState<string | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [deleteSa, setDeleteSa] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    setSeenAt(window.localStorage.getItem(SEEN_KEY) ?? new Date(0).toISOString());
+  }, []);
+
+  const markSeen = () => {
+    const now = new Date().toISOString();
+    window.localStorage.setItem(SEEN_KEY, now);
+    setSeenAt(now);
+  };
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
