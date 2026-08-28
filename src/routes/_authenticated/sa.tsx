@@ -97,44 +97,24 @@ function SAModule() {
     },
   });
 
-  const { data: mine = [] } = useQuery({
-    queryKey: ["my-records", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
-        )
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data;
-    },
-  });
-
+  // Every teacher with an attendance status checked is submitted — Present, Late or Absent.
   const readyRows = useMemo(
-    () =>
-      teachers.filter((t) => {
-        const r = rows[t.id];
-        if (!r) return false;
-        if (!r.room_assignment || !r.attendance_status) return false;
-        if (r.attendance_status !== "Absent" && (!r.time_arrival || !r.time_out)) return false;
-        return true;
-      }),
+    () => teachers.filter((t) => !!rows[t.id]?.attendance_status),
     [teachers, rows],
   );
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
-      const payload = readyRows.map((t) => {
+      const selected = readyRows;
+      if (selected.length === 0) throw new Error("No attendance status has been checked yet");
+      const payload = selected.map((t) => {
         const r = rows[t.id]!;
         return {
           teacher_id: t.id,
           department_id: departmentId,
           submitted_by: user.id,
-          room_assignment: r.room_assignment,
+          room_assignment: r.room_assignment || "—",
           time_arrival: r.time_arrival || null,
           time_out: r.time_out || null,
           attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
@@ -142,14 +122,32 @@ function SAModule() {
             r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
         };
       });
-      const { error } = await supabase.from("attendance_records").insert(payload);
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .insert(payload)
+        .select("id");
       if (error) throw error;
-      return payload.length;
+      const saved = data?.length ?? 0;
+      if (saved !== payload.length) {
+        throw new Error(
+          `Submission mismatch: ${payload.length} records checked but ${saved} saved. Please review and resubmit.`,
+        );
+      }
+      const departmentName = departments.find((d) => d.id === departmentId)?.name ?? null;
+      const { error: notifyError } = await supabase.from("submission_notifications").insert({
+        submitted_by: user.id,
+        submitted_by_name: fullName,
+        department_id: departmentId,
+        department_name: departmentName,
+        record_count: saved,
+      });
+      if (notifyError) throw notifyError;
+      return saved;
     },
     onSuccess: (count) => {
       setRows({});
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
+      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted to HR`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
