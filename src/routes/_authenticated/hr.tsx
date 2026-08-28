@@ -395,8 +395,8 @@ function HRModule() {
           <CardHeader className="no-print">
             <CardTitle>Master Attendance Table</CardTitle>
             <CardDescription>
-              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length} date
-              section{groups.length === 1 ? "" : "s"}
+              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length}{" "}
+              submission batch{groups.length === 1 ? "" : "es"} — newest first, never merged
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
