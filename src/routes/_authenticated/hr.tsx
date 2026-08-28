@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -115,6 +115,27 @@ function HRModule() {
     submitted_at: string;
   } | null>(null);
   const [page, setPage] = useState(0);
+  // Batch keys (date|time|submitter) HR has already reviewed from a notification.
+  const [reviewedKeys, setReviewedKeys] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(window.localStorage.getItem("hr-reviewed-batches") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+
+  const addReviewedKeys = (keys: string[]) => {
+    setReviewedKeys((prev) => {
+      const next = [...new Set([...prev, ...keys])].slice(-200);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("hr-reviewed-batches", JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -190,6 +211,24 @@ function HRModule() {
     },
   });
 
+  // Once a submitted batch is reviewed, register it in the Master Attendance Table.
+  useEffect(() => {
+    if (!batchView || batchRecords.length === 0) return;
+    const keys = [
+      ...new Set(
+        batchRecords.map(
+          (r) => `${r.date_submitted}|${r.time_submitted}|${r.submitted_by ?? "unknown"}`,
+        ),
+      ),
+    ];
+    addReviewedKeys(keys);
+    setHighlightKey(keys[0] ?? null);
+    queryClient.invalidateQueries({ queryKey: ["all-records"] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchView?.id, batchRecords.length]);
+
+
+
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
     enabled: !!saView,
@@ -241,6 +280,14 @@ function HRModule() {
   const pageCount = Math.max(1, Math.ceil(groups.length / DATES_PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);
   const visibleGroups = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+
+  // Jump the master table to the page holding the just-reviewed batch.
+  useEffect(() => {
+    if (!highlightKey) return;
+    const idx = groups.findIndex(([k]) => k === highlightKey);
+    if (idx >= 0) setPage(Math.floor(idx / DATES_PER_PAGE));
+  }, [highlightKey, groups]);
+
 
   const teacherRecords = useMemo(() => {
     if (!teacherView) return [];
@@ -447,13 +494,21 @@ function HRModule() {
               const date = key.split("|")[0]!;
               const time = key.split("|")[1]!;
               const submitter = rows[0]?.profiles?.full_name ?? "Unknown";
+              const isReviewed = reviewedKeys.includes(key);
               return (
-              <section key={key} className="space-y-2">
+              <section
+                key={key}
+                className={`space-y-2 rounded-md ${key === highlightKey ? "ring-2 ring-primary p-2" : ""}`}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                    Date Submitted: {date} · {formatTimeExact(time)} · {submitter} · {rows.length}{" "}
-                    record{rows.length === 1 ? "" : "s"}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
+                      Date Submitted: {date} · {formatTimeExact(time)} · {submitter} · {rows.length}{" "}
+                      record{rows.length === 1 ? "" : "s"}
+                    </div>
+                    {isReviewed && <Badge variant="secondary">Reviewed &amp; recorded</Badge>}
                   </div>
+
                   <div className="no-print flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => exportCsv(date, rows)}>
                       <Download className="mr-2 h-4 w-4" /> Export Excel
@@ -644,7 +699,15 @@ function HRModule() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!batchView} onOpenChange={(o) => !o && setBatchView(null)}>
+      <Dialog
+        open={!!batchView}
+        onOpenChange={(o) => {
+          if (!o) {
+            setBatchView(null);
+            toast.success("Reviewed batch recorded in the Master Attendance Table");
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
