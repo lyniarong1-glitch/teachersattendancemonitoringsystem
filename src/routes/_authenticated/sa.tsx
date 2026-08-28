@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Send } from "lucide-react";
+import { Search, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -68,6 +68,7 @@ function SAModule() {
   const { user, role, fullName } = useSession();
   const queryClient = useQueryClient();
   const [departmentId, setDepartmentId] = useState("");
+  const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Record<string, RowState>>({});
 
   const setRow = (id: string, patch: Partial<RowState>) =>
@@ -95,6 +96,13 @@ function SAModule() {
       return data;
     },
   });
+
+  const visibleTeachers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? teachers.filter((t) => t.full_name.toLowerCase().includes(q)) : teachers;
+  }, [teachers, search]);
+
+  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
   // Every teacher with an attendance status checked is submitted — Present, Late or Absent.
   const readyRows = useMemo(
@@ -175,26 +183,50 @@ function SAModule() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="max-w-xs space-y-2">
-              <Label>Department</Label>
-              <Select
-                value={departmentId}
-                onValueChange={(v) => {
-                  setDepartmentId(v);
-                  setRows({});
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                <SelectContent>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Select Department</Label>
+                <Select
+                  value={departmentId}
+                  onValueChange={(v) => {
+                    setDepartmentId(v);
+                    setRows({});
+                    setSearch("");
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                  <SelectContent>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Search Teacher's Name</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    value={search}
+                    disabled={!departmentId}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={departmentId ? "Type a teacher's name" : "Select a department first"}
+                  />
+                </div>
+              </div>
             </div>
 
             {departmentId && (
               <div className="overflow-x-auto rounded-md border border-border">
+                <div className="flex items-center justify-between gap-3 bg-primary/10 px-3 py-2">
+                  <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-primary-foreground">
+                    {departmentName}
+                  </span>
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Showing {visibleTeachers.length} of {teachers.length} teachers
+                  </span>
+                </div>
                 <table className="w-full min-w-[1000px] border-collapse text-sm">
                   <thead>
                     <tr className="bg-secondary/60">
@@ -226,7 +258,7 @@ function SAModule() {
                     </tr>
                   </thead>
                   <tbody>
-                    {teachers.map((t) => {
+                    {visibleTeachers.map((t) => {
                       const r = rows[t.id] ?? EMPTY_ROW;
                       return (
                         <tr key={t.id} className="align-top">
