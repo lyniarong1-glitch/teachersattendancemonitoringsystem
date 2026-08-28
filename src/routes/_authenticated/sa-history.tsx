@@ -83,9 +83,9 @@ function SubmissionHistoryPage() {
             <CardTitle className="text-base">My Recent Submission History</CardTitle>
             <CardDescription>
               {mine.length} submitted record{mine.length === 1 ? "" : "s"}, grouped by the date
-              they were submitted (most recent first). Records still waiting to sync appear here once
-              they reach the server.
+              they were submitted (most recent first), shown exactly as you submitted them to HR.
             </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoading && <p className="text-muted-foreground">Loading your submissions…</p>}
