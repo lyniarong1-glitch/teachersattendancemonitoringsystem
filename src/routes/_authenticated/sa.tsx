@@ -405,10 +405,9 @@ function SAModule() {
                     onChange={(e) => { setSearch(e.target.value); setRosterPage(1); }}
                   />
                 </div>
-
-                </div>
               </div>
             </div>
+
 
             {teacherGroups.length === 0 && (
               <p className="text-muted-foreground">No teacher matches “{search}”.</p>
