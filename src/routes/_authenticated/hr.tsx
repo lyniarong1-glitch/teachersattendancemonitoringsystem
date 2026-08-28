@@ -558,10 +558,35 @@ function HRModule() {
                 {[["Street", saProfile?.street], ["Barangay", saProfile?.barangay], ["City", saProfile?.city], ["Province", saProfile?.province]].map(([label, value]) => <div key={label}><dt className="text-xs font-bold uppercase text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-bold">{value || "—"}</dd></div>)}
               </dl>
             </section>
-            <DialogFooter><Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button></DialogFooter>
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="outline" onClick={() => setSaView(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to Master Table</Button>
+              <Button variant="destructive" onClick={() => saView && setDeleteSa({ id: saView, name: saProfile?.full_name ?? "this Student Assistant" })}><Trash2 className="mr-2 h-4 w-4" />Delete SA Account</Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteSa} onOpenChange={(o) => !o && setDeleteSa(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteSa?.name}'s account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes their access to the system. All attendance records they
+              submitted stay in the master table exactly as recorded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeSa.isPending}
+              onClick={(e) => { e.preventDefault(); if (deleteSa) removeSa.mutate(deleteSa.id); }}
+            >
+              {removeSa.isPending ? "Deleting…" : "Delete Account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
