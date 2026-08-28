@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Home, LogOut, Menu, Trash2, UserRound } from "lucide-react";
+import { History, Home, LogOut, Menu, Trash2, UserRound } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import dccSeal from "@/assets/dcc-seal.jpg.asset.json";
