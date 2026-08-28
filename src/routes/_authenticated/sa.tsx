@@ -356,9 +356,11 @@ function SAModule() {
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Pick a department, fill in the rows you observed, then submit. Entries are saved on this
-              device automatically — you can work offline and switch departments without losing them.
+              Pick a department — or search a teacher's name across every department — fill in the
+              rows you observed, then submit. Entries are saved on this device automatically, so you
+              can work offline and switch departments without losing anything.
             </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="flex flex-wrap gap-4">
