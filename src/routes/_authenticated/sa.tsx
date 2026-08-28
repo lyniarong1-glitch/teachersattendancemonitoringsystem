@@ -123,9 +123,11 @@ function SAModule() {
       if (!user) throw new Error("Not signed in");
       const selected = readyRows;
       if (selected.length === 0) throw new Error("No attendance status has been checked yet");
+      const stamp = localSubmissionStamp();
       const payload = selected.map((t) => {
         const r = rows[t.id]!;
         return {
+          ...stamp,
           teacher_id: t.id,
           department_id: t.department_id,
           submitted_by: user.id,
