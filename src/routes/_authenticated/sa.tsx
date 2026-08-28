@@ -376,7 +376,7 @@ function SAModule() {
                 </Select>
               </div>
               <div className="w-full max-w-xs space-y-2">
-                <Label htmlFor="teacher-search">Search teacher</Label>
+                <Label htmlFor="teacher-search">Search teacher (all departments)</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -385,11 +385,11 @@ function SAModule() {
                     placeholder="Type a teacher's name"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    disabled={!departmentId}
                   />
                 </div>
               </div>
             </div>
+
 
             {departmentId && (
               <div className="overflow-x-auto rounded-md border border-border">
