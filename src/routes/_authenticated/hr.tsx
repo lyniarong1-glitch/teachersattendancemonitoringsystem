@@ -52,6 +52,7 @@ import {
   STATUS_OPTIONS,
   TIME_SLOTS,
   formatTime,
+  formatTimeExact,
 } from "@/lib/attendance-constants";
 
 export const Route = createFileRoute("/_authenticated/hr")({

@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatTime, formatTimeExact, formatTimeExact } from "@/lib/attendance-constants";
+import { formatTime, formatTimeExact } from "@/lib/attendance-constants";
 
 export const Route = createFileRoute("/_authenticated/sa-history")({
   head: () => ({
