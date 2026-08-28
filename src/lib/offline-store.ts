@@ -10,23 +10,6 @@ export type OfflineRow = {
   other_remark: string;
 };
 
-export type PendingRecord = {
-  client_uuid: string;
-  teacher_id: string;
-  teacher_name: string;
-  department_id: string;
-  department_name: string;
-  submitted_by: string;
-  room_assignment: string;
-  time_arrival: string | null;
-  time_out: string | null;
-  attendance_status: "Present" | "Late" | "Absent";
-  remarks: string | null;
-  date_submitted: string;
-  time_submitted: string;
-  saved_at: string;
-};
-
 const hasStorage = () => typeof window !== "undefined" && !!window.localStorage;
 
 function read<T>(key: string, fallback: T): T {
@@ -70,33 +53,6 @@ export function loadDrafts(userId: string): DraftsByDepartment {
 
 export function saveDrafts(userId: string, drafts: DraftsByDepartment) {
   write(draftsKey(userId), drafts);
-}
-
-/* ---------- pending (offline) submissions queue ---------- */
-
-const queueKey = (userId: string) => `tams:queue:${userId}`;
-
-export function loadQueue(userId: string): PendingRecord[] {
-  return read<PendingRecord[]>(queueKey(userId), []);
-}
-
-export function saveQueue(userId: string, queue: PendingRecord[]) {
-  write(queueKey(userId), queue);
-}
-
-export function enqueue(userId: string, records: PendingRecord[]): PendingRecord[] {
-  const existing = loadQueue(userId);
-  const seen = new Set(existing.map((r) => r.client_uuid));
-  const merged = [...existing, ...records.filter((r) => !seen.has(r.client_uuid))];
-  saveQueue(userId, merged);
-  return merged;
-}
-
-export function dequeue(userId: string, uuids: string[]): PendingRecord[] {
-  const done = new Set(uuids);
-  const left = loadQueue(userId).filter((r) => !done.has(r.client_uuid));
-  saveQueue(userId, left);
-  return left;
 }
 
 export function newClientUuid(): string {

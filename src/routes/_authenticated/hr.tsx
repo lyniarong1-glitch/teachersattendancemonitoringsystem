@@ -172,7 +172,7 @@ function HRModule() {
   });
 
 
-  // New/synced submissions appear on this page as soon as they reach the server.
+  // New submissions appear on this page as soon as they reach the server.
   useEffect(() => {
     const channel = supabase
       .channel("hr-attendance-feed")
