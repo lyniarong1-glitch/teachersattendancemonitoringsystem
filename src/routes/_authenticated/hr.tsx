@@ -339,12 +339,28 @@ function HRModule() {
             {notifications.map((n) => (
               <div
                 key={n.id}
-                className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm ${n.read_at ? "opacity-60" : "bg-secondary/40 font-medium"}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setBatchView(n);
+                  if (!n.read_at) markRead.mutate(n.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setBatchView(n);
+                    if (!n.read_at) markRead.mutate(n.id);
+                  }
+                }}
+                className={`flex cursor-pointer flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm transition hover:border-primary hover:bg-secondary/60 ${n.read_at ? "opacity-60" : "bg-secondary/40 font-medium"}`}
               >
                 <span>
                   <button
                     className="underline underline-offset-2"
-                    onClick={() => setSaView(n.submitted_by)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSaView(n.submitted_by);
+                    }}
                   >
                     {n.submitted_by_name ?? "Student Assistant"}
                   </button>{" "}
@@ -353,11 +369,21 @@ function HRModule() {
                   {n.department_name ? ` for ${n.department_name}` : ""} on{" "}
                   {new Date(n.submitted_at).toLocaleString()}
                 </span>
-                {!n.read_at && (
-                  <Button variant="ghost" size="sm" onClick={() => markRead.mutate(n.id)}>
-                    Mark read
-                  </Button>
-                )}
+                <span className="flex items-center gap-2">
+                  <Badge variant="outline">Click to review</Badge>
+                  {!n.read_at && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markRead.mutate(n.id);
+                      }}
+                    >
+                      Mark read
+                    </Button>
+                  )}
+                </span>
               </div>
             ))}
           </CardContent>
