@@ -82,7 +82,7 @@ function SubmissionHistoryPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">My Recent Submission History</CardTitle>
             <CardDescription>
-              {mine.length} saved / synced record{mine.length === 1 ? "" : "s"}, grouped by the date
+              {mine.length} submitted record{mine.length === 1 ? "" : "s"}, grouped by the date
               they were submitted (most recent first). Records still waiting to sync appear here once
               they reach the server.
             </CardDescription>
