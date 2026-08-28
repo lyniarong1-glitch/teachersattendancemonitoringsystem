@@ -107,10 +107,11 @@ type RecordRow = {
   profiles: { full_name: string } | null;
 };
 
-/** Name of the SA who submitted a record — falls back to the stored snapshot
- *  so deleted accounts keep their attribution. */
+/** Name of the SA who submitted a record. The snapshot stored at submission
+ *  time wins, so the record always shows exactly who submitted it — even if the
+ *  profile was later renamed or the account was deleted. */
 function submitterName(r: RecordRow) {
-  return r.profiles?.full_name ?? r.submitted_by_name ?? "—";
+  return r.submitted_by_name ?? r.profiles?.full_name ?? "—";
 }
 
 const DATES_PER_PAGE = 3;
