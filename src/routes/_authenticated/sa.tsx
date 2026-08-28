@@ -87,7 +87,7 @@ function SAModule() {
   const [syncing, setSyncing] = useState(false);
   const hydratedFor = useRef<string | null>(null);
 
-  const rows = drafts[departmentId] ?? {};
+  const getRow = (t: Teacher): RowState => drafts[t.department_id]?.[t.id] ?? EMPTY_ROW;
 
   // Load locally-saved drafts + pending queue once the user is known.
   useEffect(() => {
