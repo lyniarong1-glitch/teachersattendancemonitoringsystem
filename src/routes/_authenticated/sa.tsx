@@ -169,6 +169,18 @@ function SAModule() {
     return teachers.filter((t) => t.department_id === departmentId);
   }, [teachers, search, departmentId]);
 
+  // Grouped by department so the sheet mirrors the printed roster format.
+  const teacherGroups = useMemo(() => {
+    const map = new Map<string, Teacher[]>();
+    for (const t of visibleTeachers) {
+      const list = map.get(t.department_id);
+      if (list) list.push(t);
+      else map.set(t.department_id, [t]);
+    }
+    return [...map.entries()];
+  }, [visibleTeachers]);
+
+
   const isComplete = (r?: RowState) => {
     if (!r) return false;
     if (!r.room_assignment || !r.attendance_status) return false;
