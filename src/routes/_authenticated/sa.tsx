@@ -165,7 +165,7 @@ function SAModule() {
   const visibleTeachers = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (q) return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
-    if (!departmentId) return [];
+    if (!departmentId) return teachers;
     return teachers.filter((t) => t.department_id === departmentId);
   }, [teachers, search, departmentId]);
 
