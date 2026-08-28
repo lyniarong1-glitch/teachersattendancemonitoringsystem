@@ -200,75 +200,16 @@ function SAModule() {
 
 
 
-  const pushToServer = useCallback(
-    async (records: PendingRecord[]) => {
-      const payload = records.map((r) => ({
-        client_uuid: r.client_uuid,
-        teacher_id: r.teacher_id,
-        department_id: r.department_id,
-        submitted_by: r.submitted_by,
-        room_assignment: r.room_assignment,
-        time_arrival: r.time_arrival,
-        time_out: r.time_out,
-        attendance_status: r.attendance_status,
-        remarks: r.remarks,
-        date_submitted: r.date_submitted,
-        time_submitted: r.time_submitted,
-      }));
-      // Duplicate-safe: the server ignores records whose client reference already exists.
-      const { error } = await supabase
-        .from("attendance_records")
-        .upsert(payload, { onConflict: "client_uuid", ignoreDuplicates: true });
-      if (error) throw error;
-    },
-    [],
-  );
-
-  const syncPending = useCallback(
-    async (silent = false) => {
-      if (!user) return;
-      const queue = loadQueue(user.id);
-      if (queue.length === 0) {
-        if (!silent) toast.info("Nothing to sync — all records are already submitted.");
-        return;
-      }
-      if (!navigator.onLine) {
-        if (!silent) toast.error("Still offline. Your records stay saved on this device.");
-        return;
-      }
-      setSyncing(true);
-      try {
-        await pushToServer(queue);
-        setPending(dequeue(user.id, queue.map((r) => r.client_uuid)));
-        void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-        toast.success(`${queue.length} saved record${queue.length === 1 ? "" : "s"} synced`);
-      } catch (e) {
-        if (!silent) toast.error(`Sync failed: ${(e as Error).message}. Records are still saved locally.`);
-      } finally {
-        setSyncing(false);
-      }
-    },
-    [user, pushToServer, queryClient],
-  );
-
-  // Auto-sync as soon as the connection comes back.
-  useEffect(() => {
-    if (online && pending.length > 0) void syncPending(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
-
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
       const stamp = localDateTime();
-      const records: PendingRecord[] = readyRows.map((t) => {
+      const records = readyRows.map((t) => {
         const r = drafts[t.department_id]![t.id]!;
         return {
           client_uuid: newClientUuid(),
           teacher_id: t.id,
-          teacher_name: t.full_name,
           department_id: t.department_id,
-          department_name: deptName(t.department_id),
           submitted_by: user.id,
           room_assignment: r.room_assignment,
           time_arrival: r.time_arrival || null,
@@ -276,15 +217,17 @@ function SAModule() {
           attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
           remarks: r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
           ...stamp,
-          saved_at: new Date().toISOString(),
         };
       });
       if (records.length === 0) throw new Error("No completed rows to submit");
 
-      // Always persist locally first so nothing can be lost.
-      const queue = enqueue(user.id, records);
-      setPending(queue);
-      // Clear only the rows that were captured into the queue, in every department.
+      // Duplicate-safe: the server ignores records whose client reference already exists.
+      const { error } = await supabase
+        .from("attendance_records")
+        .upsert(records, { onConflict: "client_uuid", ignoreDuplicates: true });
+      if (error) throw error;
+
+      // Clear only the rows that were successfully submitted, in every department.
       setDrafts((prev) => {
         const next: DraftsByDepartment = { ...prev };
         for (const r of records) {
@@ -296,29 +239,15 @@ function SAModule() {
         return next;
       });
 
-
-      if (!navigator.onLine) return { count: records.length, offline: true };
-
-      try {
-        await pushToServer(records);
-        setPending(dequeue(user.id, records.map((r) => r.client_uuid)));
-        return { count: records.length, offline: false };
-      } catch {
-        return { count: records.length, offline: true };
-      }
+      return { count: records.length };
     },
-    onSuccess: ({ count, offline }) => {
+    onSuccess: ({ count }) => {
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      if (offline) {
-        toast.success(
-          `${count} record${count === 1 ? "" : "s"} saved on this device — they will sync when you're back online.`,
-        );
-      } else {
-        toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
-      }
+      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted to HR`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (role && role !== "student_assistant") {
     return (
