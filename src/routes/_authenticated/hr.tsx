@@ -443,11 +443,16 @@ function HRModule() {
               </p>
             )}
 
-            {visibleGroups.map(([date, rows]) => (
-              <section key={date} className="space-y-2">
+            {visibleGroups.map(([key, rows]) => {
+              const date = key.split("|")[0]!;
+              const time = key.split("|")[1]!;
+              const submitter = rows[0]?.profiles?.full_name ?? "Unknown";
+              return (
+              <section key={key} className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                    Date Submitted: {date}
+                    Date Submitted: {date} · {formatTimeExact(time)} · {submitter} · {rows.length}{" "}
+                    record{rows.length === 1 ? "" : "s"}
                   </div>
                   <div className="no-print flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => exportCsv(date, rows)}>
