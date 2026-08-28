@@ -726,6 +726,73 @@ function HRModule() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={saListOpen} onOpenChange={setSaListOpen}>
+        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registered Student Assistants</DialogTitle>
+            <DialogDescription>
+              {studentAssistants.length} registered account
+              {studentAssistants.length === 1 ? "" : "s"}. Open a profile for full details, or
+              delete an account — submitted attendance records are always preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Full Name</TableHead>
+                <TableHead>ID Number</TableHead>
+                <TableHead>Course / Year</TableHead>
+                <TableHead>Class Schedule</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Mobile</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {studentAssistants.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    No Student Assistant accounts registered yet.
+                  </TableCell>
+                </TableRow>
+              )}
+              {studentAssistants.map((sa) => (
+                <TableRow key={sa.id}>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="text-left font-bold text-primary underline underline-offset-2 hover:opacity-80"
+                      onClick={() => { setSaListOpen(false); setSaView(sa.id); }}
+                    >
+                      {sa.full_name}
+                    </button>
+                  </TableCell>
+                  <TableCell>{sa.id_number || "—"}</TableCell>
+                  <TableCell>{[sa.grade_level, sa.course ?? sa.course_year].filter(Boolean).join(" · ") || "—"}</TableCell>
+                  <TableCell>{sa.class_schedule || "—"}</TableCell>
+                  <TableCell className="break-all">{sa.email}</TableCell>
+                  <TableCell>{sa.mobile_number || "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteSa({ id: sa.id, name: sa.full_name })}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaListOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+
       <AlertDialog open={!!deleteSa} onOpenChange={(o) => !o && setDeleteSa(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
