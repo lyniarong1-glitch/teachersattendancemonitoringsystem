@@ -92,7 +92,7 @@ function SubmissionHistoryPage() {
             {!isLoading && mine.length === 0 && (
               <p className="text-muted-foreground">No records submitted yet.</p>
             )}
-            {historyGroups.map(([date, rowsForDate]) => (
+            {pagedGroups.map(([date, rowsForDate]) => (
               <section key={date} className="space-y-2">
                 <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
                   Date Submitted: {date} · {rowsForDate.length} record
