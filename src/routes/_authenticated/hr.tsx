@@ -635,6 +635,92 @@ function HRModule() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!batchView} onOpenChange={(o) => !o && setBatchView(null)}>
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Submitted Attendance Records — {batchView?.submitted_by_name ?? "Student Assistant"}
+            </DialogTitle>
+            <DialogDescription>
+              {batchView?.record_count} record{batchView?.record_count === 1 ? "" : "s"}
+              {batchView?.department_name ? ` · ${batchView.department_name}` : ""} · submitted{" "}
+              {batchView ? new Date(batchView.submitted_at).toLocaleString() : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Room</TableHead>
+                  <TableHead>Time In</TableHead>
+                  <TableHead>Time Out</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Remarks</TableHead>
+                  <TableHead>Time Submitted</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {batchLoading && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      Loading records…
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!batchLoading && batchRecords.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      No records found for this submission.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {batchRecords.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <button
+                        className="underline underline-offset-2"
+                        onClick={() => {
+                          setBatchView(null);
+                          setTeacherView({ id: r.teacher_id, name: r.teachers?.full_name ?? "" });
+                        }}
+                      >
+                        {r.teachers?.full_name ?? "—"}
+                      </button>
+                    </TableCell>
+                    <TableCell>{r.departments?.name}</TableCell>
+                    <TableCell>{r.room_assignment}</TableCell>
+                    <TableCell>{formatTime(r.time_arrival)}</TableCell>
+                    <TableCell>{formatTime(r.time_out)}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(r.attendance_status)}>
+                        {r.attendance_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{r.remarks || "None"}</TableCell>
+                    <TableCell>
+                      {r.date_submitted} {formatTimeExact(r.time_submitted)}
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                        <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchView(null)}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!saView} onOpenChange={(o) => !o && setSaView(null)}>
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto p-0">
           <div className="bg-primary p-6 text-primary-foreground">
