@@ -197,7 +197,7 @@ function SAModule() {
   );
 
 
-  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
+  const deptName = (id: string) => departments.find((d) => d.id === id)?.name ?? "";
 
   const pushToServer = useCallback(
     async (records: PendingRecord[]) => {
