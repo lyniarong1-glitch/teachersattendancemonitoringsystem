@@ -281,6 +281,14 @@ function HRModule() {
   const safePage = Math.min(page, pageCount - 1);
   const visibleGroups = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
 
+  // Jump the master table to the page holding the just-reviewed batch.
+  useEffect(() => {
+    if (!highlightKey) return;
+    const idx = groups.findIndex(([k]) => k === highlightKey);
+    if (idx >= 0) setPage(Math.floor(idx / DATES_PER_PAGE));
+  }, [highlightKey, groups]);
+
+
   const teacherRecords = useMemo(() => {
     if (!teacherView) return [];
     return records
