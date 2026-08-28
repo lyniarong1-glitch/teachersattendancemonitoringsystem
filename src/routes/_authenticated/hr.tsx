@@ -168,6 +168,28 @@ function HRModule() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const { data: batchRecords = [], isLoading: batchLoading } = useQuery({
+    queryKey: ["batch-records", batchView?.id],
+    enabled: !!batchView,
+    queryFn: async () => {
+      const submittedAt = new Date(batchView!.submitted_at);
+      const from = new Date(submittedAt.getTime() - 5 * 60 * 1000).toISOString();
+      const to = new Date(submittedAt.getTime() + 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .select(
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+        )
+        .eq("submitted_by", batchView!.submitted_by!)
+        .gte("created_at", from)
+        .lte("created_at", to)
+        .order("created_at", { ascending: false })
+        .limit(batchView!.record_count || 500);
+      if (error) throw error;
+      return data as unknown as RecordRow[];
+    },
+  });
+
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
     enabled: !!saView,
