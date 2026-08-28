@@ -120,17 +120,19 @@ function HRModule() {
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["all-records"],
+    refetchInterval: 30000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+          "id, created_at, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as unknown as RecordRow[];
     },
   });
+
 
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
