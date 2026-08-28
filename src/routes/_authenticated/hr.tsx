@@ -308,7 +308,84 @@ function HRModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
+        <Card className={`no-print border-l-4 ${newRecords.length ? "border-l-primary" : "border-l-muted"}`}>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div className="flex items-center gap-3">
+              <span className="relative">
+                <Bell className={`h-5 w-5 ${newRecords.length ? "text-primary" : "text-muted-foreground"}`} />
+                {newRecords.length > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {newRecords.length > 99 ? "99+" : newRecords.length}
+                  </span>
+                )}
+              </span>
+              <div>
+                <p className="font-bold">
+                  {newRecords.length
+                    ? `${newRecords.length} new attendance record${newRecords.length === 1 ? "" : "s"} submitted`
+                    : "No new attendance records"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {newRecords.length
+                    ? newRecords
+                        .slice(0, 3)
+                        .map((r) => `${r.teachers?.full_name ?? "Teacher"} by ${r.profiles?.full_name ?? "SA"}`)
+                        .join(" · ")
+                    : "You're up to date. New submissions appear here automatically."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {newRecords.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setNotifOpen(true)}>
+                  View new records
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" disabled={!newRecords.length} onClick={markSeen}>
+                Mark all as read
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
+          <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>New attendance submissions</DialogTitle>
+              <DialogDescription>
+                {newRecords.length} record{newRecords.length === 1 ? "" : "s"} submitted since you last checked.
+              </DialogDescription>
+            </DialogHeader>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date Submitted</TableHead>
+                  <TableHead>Submitted By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {newRecords.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.teachers?.full_name}</TableCell>
+                    <TableCell>{r.departments?.name}</TableCell>
+                    <TableCell><Badge variant="secondary">{r.attendance_status}</Badge></TableCell>
+                    <TableCell>{r.date_submitted}</TableCell>
+                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <DialogFooter>
+              <Button onClick={() => { markSeen(); setNotifOpen(false); }}>Mark all as read</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Card>
+
           <CardHeader className="no-print">
             <CardTitle>Master Attendance Table</CardTitle>
             <CardDescription>
