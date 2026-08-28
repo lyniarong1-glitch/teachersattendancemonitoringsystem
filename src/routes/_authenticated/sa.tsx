@@ -137,26 +137,23 @@ function SAModule() {
   });
 
   const { data: teachers = [] } = useQuery({
-    queryKey: ["teachers", departmentId],
-    enabled: !!departmentId,
+    queryKey: ["teachers", "all"],
     queryFn: async () => {
       try {
         const { data, error } = await supabase
           .from("teachers")
-          .select("id, full_name")
-          .eq("department_id", departmentId)
+          .select("id, full_name, department_id")
           .order("full_name");
         if (error) throw error;
-        cacheSet(`teachers:${departmentId}`, data);
+        cacheSet("teachers:all", data);
         return data as Teacher[];
       } catch (e) {
-        const cached = cacheGet<Teacher[]>(`teachers:${departmentId}`);
+        const cached = cacheGet<Teacher[]>("teachers:all");
         if (cached) return cached;
         throw e;
       }
     },
-    initialData: () =>
-      departmentId ? (cacheGet<Teacher[]>(`teachers:${departmentId}`) ?? undefined) : undefined,
+    initialData: () => cacheGet<Teacher[]>("teachers:all") ?? undefined,
   });
 
   const { data: mine = [] } = useQuery({
@@ -169,17 +166,19 @@ function SAModule() {
           "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
         )
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(200);
       if (error) throw error;
       return data;
     },
   });
 
+  // Search works across every department, even before one is selected.
   const visibleTeachers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return teachers;
-    return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
-  }, [teachers, search]);
+    if (q) return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
+    if (!departmentId) return [];
+    return teachers.filter((t) => t.department_id === departmentId);
+  }, [teachers, search, departmentId]);
 
   const isComplete = (r?: RowState) => {
     if (!r) return false;
@@ -188,12 +187,13 @@ function SAModule() {
     return true;
   };
 
-  // Ready rows are computed from the full roster, never from the search view,
-  // so filtering can never drop a recorded row.
+  // Ready rows are computed from every department's saved drafts, never from the
+  // search view, so filtering or switching departments can never drop a record.
   const readyRows = useMemo(
-    () => teachers.filter((t) => isComplete(rows[t.id])),
-    [teachers, rows],
+    () => teachers.filter((t) => isComplete(drafts[t.department_id]?.[t.id])),
+    [teachers, drafts],
   );
+
 
   const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
