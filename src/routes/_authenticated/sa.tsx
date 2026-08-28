@@ -430,18 +430,22 @@ function SAModule() {
                   <tbody>
                     {visibleTeachers.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="border border-border px-3 py-6 text-center text-muted-foreground">
+                        <td colSpan={9} className="border border-border px-3 py-6 text-center text-muted-foreground">
                           No teacher matches “{search}”.
                         </td>
                       </tr>
                     )}
                     {visibleTeachers.map((t) => {
-                      const r = rows[t.id] ?? EMPTY_ROW;
+                      const r = getRow(t);
                       return (
                         <tr key={t.id} className="align-top">
                           <td className="border border-border px-3 py-2 font-medium">
                             {t.full_name}
                           </td>
+                          <td className="border border-border px-3 py-2 text-muted-foreground">
+                            {deptName(t.department_id)}
+                          </td>
+
                           <td className="border border-border p-1">
                             <Select
                               value={r.room_assignment}
