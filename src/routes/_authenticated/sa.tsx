@@ -64,10 +64,12 @@ const EMPTY_ROW: RowState = {
   other_remark: "",
 };
 
+type Teacher = { id: string; full_name: string; department_id: string };
+
 function SAModule() {
   const { user, role, fullName } = useSession();
   const queryClient = useQueryClient();
-  const [departmentId, setDepartmentId] = useState("");
+  const [departmentId, setDepartmentId] = useState("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Record<string, RowState>>({});
 
@@ -84,25 +86,30 @@ function SAModule() {
   });
 
   const { data: teachers = [] } = useQuery({
-    queryKey: ["teachers", departmentId],
-    enabled: !!departmentId,
+    queryKey: ["teachers-all"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teachers")
-        .select("id, full_name")
-        .eq("department_id", departmentId)
+        .select("id, full_name, department_id")
         .order("full_name");
       if (error) throw error;
-      return data;
+      return data as Teacher[];
     },
   });
 
-  const visibleTeachers = useMemo(() => {
+  const groups = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? teachers.filter((t) => t.full_name.toLowerCase().includes(q)) : teachers;
-  }, [teachers, search]);
-
-  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
+    return departments
+      .filter((d) => departmentId === "all" || d.id === departmentId)
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        teachers: teachers.filter(
+          (t) => t.department_id === d.id && (!q || t.full_name.toLowerCase().includes(q)),
+        ),
+      }))
+      .filter((g) => g.teachers.length > 0 || !q);
+  }, [departments, teachers, departmentId, search]);
 
   // Every teacher with an attendance status checked is submitted — Present, Late or Absent.
   const readyRows = useMemo(
@@ -119,14 +126,13 @@ function SAModule() {
         const r = rows[t.id]!;
         return {
           teacher_id: t.id,
-          department_id: departmentId,
+          department_id: t.department_id,
           submitted_by: user.id,
           room_assignment: r.room_assignment || "—",
           time_arrival: r.time_arrival || null,
           time_out: r.time_out || null,
           attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
-          remarks:
-            r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
+          remarks: r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
         };
       });
       const { data, error } = await supabase
@@ -140,12 +146,15 @@ function SAModule() {
           `Submission mismatch: ${payload.length} records checked but ${saved} saved. Please review and resubmit.`,
         );
       }
-      const departmentName = departments.find((d) => d.id === departmentId)?.name ?? null;
+      const usedDepartments = Array.from(new Set(selected.map((t) => t.department_id)));
+      const singleDept = usedDepartments.length === 1 ? usedDepartments[0]! : null;
       const { error: notifyError } = await supabase.from("submission_notifications").insert({
         submitted_by: user.id,
         submitted_by_name: fullName,
-        department_id: departmentId,
-        department_name: departmentName,
+        department_id: singleDept,
+        department_name: singleDept
+          ? (departments.find((d) => d.id === singleDept)?.name ?? null)
+          : `${usedDepartments.length} departments`,
         record_count: saved,
       });
       if (notifyError) throw notifyError;
@@ -178,24 +187,18 @@ function SAModule() {
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Pick a department, fill in the rows you observed, then submit. Your account ID and an
-              exact timestamp are attached automatically.
+              Fill in the rows you observed, then submit. Your account ID and an exact timestamp are
+              attached automatically.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Select Department</Label>
-                <Select
-                  value={departmentId}
-                  onValueChange={(v) => {
-                    setDepartmentId(v);
-                    setRows({});
-                    setSearch("");
-                  }}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                <Label className="font-bold uppercase tracking-wide">Select Department:</Label>
+                <Select value={departmentId} onValueChange={setDepartmentId}>
+                  <SelectTrigger><SelectValue placeholder="All departments" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">All departments</SelectItem>
                     {departments.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}
@@ -203,151 +206,165 @@ function SAModule() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Search Teacher's Name</Label>
+                <Label className="font-bold uppercase tracking-wide">Search Teachers Name:</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     className="pl-9"
                     value={search}
-                    disabled={!departmentId}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder={departmentId ? "Type a teacher's name" : "Select a department first"}
+                    placeholder="Type a teacher's name"
                   />
                 </div>
               </div>
             </div>
 
-            {departmentId && (
-              <div className="overflow-x-auto rounded-md border border-border">
-                <div className="flex items-center justify-between gap-3 bg-primary/10 px-3 py-2">
-                  <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-primary-foreground">
-                    {departmentName}
-                  </span>
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Showing {visibleTeachers.length} of {teachers.length} teachers
-                  </span>
-                </div>
-                <table className="w-full min-w-[1000px] border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-secondary/60">
-                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
-                        Teacher's Name
-                      </th>
-                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
-                        Room Assigned
-                      </th>
-                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
-                        Time In
-                      </th>
-                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
-                        Time Out
-                      </th>
-                      <th colSpan={3} className="border border-border px-3 py-2 text-center">
-                        Attendance Status
-                      </th>
-                      <th rowSpan={2} className="border border-border px-3 py-2 text-left">
-                        Remarks
-                      </th>
-                    </tr>
-                    <tr className="bg-secondary/60">
-                      {STATUS_OPTIONS.map((s) => (
-                        <th key={s} className="border border-border px-3 py-1 text-center w-12">
-                          {s[0]}
+            {groups.map((g) => (
+              <section key={g.id} className="space-y-2">
+                <span className="inline-block rounded bg-primary px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-primary-foreground">
+                  {g.name}
+                </span>
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="w-full min-w-[1000px] border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-secondary/60">
+                        <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                          Teachers Name
                         </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleTeachers.map((t) => {
-                      const r = rows[t.id] ?? EMPTY_ROW;
-                      return (
-                        <tr key={t.id} className="align-top">
-                          <td className="border border-border px-3 py-2 font-medium">
-                            {t.full_name}
-                          </td>
-                          <td className="border border-border p-1">
-                            <Select
-                              value={r.room_assignment}
-                              onValueChange={(v) => setRow(t.id, { room_assignment: v === "__clear__" ? "" : v })}
-                            >
-                              <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
-                              <SelectContent className="max-h-72">
-                                <SelectItem value="__clear__">Clear selection</SelectItem>
-                                {ROOMS.map((room) => (
-                                  <SelectItem key={room} value={room}>{room}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="border border-border p-1">
-                            <Select
-                              value={r.time_arrival}
-                              onValueChange={(v) => setRow(t.id, { time_arrival: v === "__clear__" ? "" : v })}
-                            >
-                              <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent className="max-h-72">
-                                <SelectItem value="__clear__">Clear</SelectItem>
-                                {TIME_SLOTS.map((s) => (
-                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="border border-border p-1">
-                            <Select
-                              value={r.time_out}
-                              onValueChange={(v) => setRow(t.id, { time_out: v === "__clear__" ? "" : v })}
-                            >
-                              <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent className="max-h-72">
-                                <SelectItem value="__clear__">Clear</SelectItem>
-                                {TIME_SLOTS.map((s) => (
-                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          {STATUS_OPTIONS.map((s) => (
-                            <td key={s} className="border border-border p-1 text-center">
-                              <Checkbox
-                                aria-label={`${s} — ${t.full_name}`}
-                                checked={r.attendance_status === s}
-                                onCheckedChange={(c) =>
-                                  setRow(t.id, { attendance_status: c ? s : "" })
-                                }
-                              />
-                            </td>
-                          ))}
-                          <td className="border border-border p-1">
-                            <Select
-                              value={r.remarks}
-                              onValueChange={(v) => setRow(t.id, { remarks: v === "__clear__" ? "None" : v })}
-                            >
-                              <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__clear__">Clear selection</SelectItem>
-                                {REMARKS_OPTIONS.map((o) => (
-                                  <SelectItem key={o} value={o}>{o}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {r.remarks === "Others" && (
-                              <Input
-                                className="mt-1 h-9 w-44"
-                                maxLength={200}
-                                value={r.other_remark}
-                                onChange={(e) => setRow(t.id, { other_remark: e.target.value })}
-                                placeholder="Specify remark"
-                              />
-                            )}
+                        <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                          Room Assigned
+                        </th>
+                        <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                          Time In
+                        </th>
+                        <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                          Time Out
+                        </th>
+                        <th colSpan={3} className="border border-border px-3 py-2 text-center">
+                          Attendance Status
+                        </th>
+                        <th rowSpan={2} className="border border-border px-3 py-2 text-left">
+                          Remarks
+                        </th>
+                      </tr>
+                      <tr className="bg-secondary/60">
+                        {STATUS_OPTIONS.map((s) => (
+                          <th key={s} className="w-12 border border-border px-3 py-1 text-center">
+                            {s[0]}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.teachers.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="border border-border px-3 py-6 text-center text-muted-foreground"
+                          >
+                            No teachers found.
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      )}
+                      {g.teachers.map((t) => {
+                        const r = rows[t.id] ?? EMPTY_ROW;
+                        return (
+                          <tr key={t.id} className="align-top">
+                            <td className="border border-border px-3 py-2 font-medium">
+                              {t.full_name}
+                            </td>
+                            <td className="border border-border p-1">
+                              <Select
+                                value={r.room_assignment}
+                                onValueChange={(v) =>
+                                  setRow(t.id, { room_assignment: v === "__clear__" ? "" : v })
+                                }
+                              >
+                                <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Room" /></SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                  <SelectItem value="__clear__">Clear selection</SelectItem>
+                                  {ROOMS.map((room) => (
+                                    <SelectItem key={room} value={room}>{room}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="border border-border p-1">
+                              <Select
+                                value={r.time_arrival}
+                                onValueChange={(v) =>
+                                  setRow(t.id, { time_arrival: v === "__clear__" ? "" : v })
+                                }
+                              >
+                                <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                  <SelectItem value="__clear__">Clear</SelectItem>
+                                  {TIME_SLOTS.map((s) => (
+                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="border border-border p-1">
+                              <Select
+                                value={r.time_out}
+                                onValueChange={(v) =>
+                                  setRow(t.id, { time_out: v === "__clear__" ? "" : v })
+                                }
+                              >
+                                <SelectTrigger className="h-9 w-28"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                  <SelectItem value="__clear__">Clear</SelectItem>
+                                  {TIME_SLOTS.map((s) => (
+                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            {STATUS_OPTIONS.map((s) => (
+                              <td key={s} className="border border-border p-1 text-center">
+                                <Checkbox
+                                  aria-label={`${s} — ${t.full_name}`}
+                                  checked={r.attendance_status === s}
+                                  onCheckedChange={(c) =>
+                                    setRow(t.id, { attendance_status: c ? s : "" })
+                                  }
+                                />
+                              </td>
+                            ))}
+                            <td className="border border-border p-1">
+                              <Select
+                                value={r.remarks}
+                                onValueChange={(v) =>
+                                  setRow(t.id, { remarks: v === "__clear__" ? "None" : v })
+                                }
+                              >
+                                <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Remarks" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__clear__">Clear selection</SelectItem>
+                                  {REMARKS_OPTIONS.map((o) => (
+                                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {r.remarks === "Others" && (
+                                <Input
+                                  className="mt-1 h-9 w-44"
+                                  maxLength={200}
+                                  value={r.other_remark}
+                                  onChange={(e) => setRow(t.id, { other_remark: e.target.value })}
+                                  placeholder="Specify remark"
+                                />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
 
             <div className="flex flex-wrap items-center gap-3">
               <Button
@@ -368,9 +385,7 @@ function SAModule() {
             </div>
           </CardContent>
         </Card>
-
       </main>
     </div>
   );
 }
-
