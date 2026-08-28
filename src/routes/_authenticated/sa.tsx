@@ -109,16 +109,17 @@ function SAModule() {
     };
   }, []);
 
-  const setRow = (id: string, patch: Partial<RowState>) => {
-    if (!departmentId) return;
+  const setRow = (deptId: string, id: string, patch: Partial<RowState>) => {
+    if (!deptId) return;
     setDrafts((prev) => {
-      const dept = { ...(prev[departmentId] ?? {}) };
+      const dept = { ...(prev[deptId] ?? {}) };
       dept[id] = { ...EMPTY_ROW, ...dept[id], ...patch };
-      const next = { ...prev, [departmentId]: dept };
+      const next = { ...prev, [deptId]: dept };
       if (user) saveDrafts(user.id, next);
       return next;
     });
   };
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
