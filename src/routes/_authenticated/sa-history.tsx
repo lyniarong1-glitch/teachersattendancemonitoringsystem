@@ -59,6 +59,16 @@ function SubmissionHistoryPage() {
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [mine]);
 
+  const GROUPS_PER_PAGE = 5;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(historyGroups.length / GROUPS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedGroups = historyGroups.slice(
+    (currentPage - 1) * GROUPS_PER_PAGE,
+    currentPage * GROUPS_PER_PAGE,
+  );
+
+
   return (
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
