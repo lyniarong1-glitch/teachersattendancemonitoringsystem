@@ -115,6 +115,27 @@ function HRModule() {
     submitted_at: string;
   } | null>(null);
   const [page, setPage] = useState(0);
+  // Batch keys (date|time|submitter) HR has already reviewed from a notification.
+  const [reviewedKeys, setReviewedKeys] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(window.localStorage.getItem("hr-reviewed-batches") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+
+  const addReviewedKeys = (keys: string[]) => {
+    setReviewedKeys((prev) => {
+      const next = [...new Set([...prev, ...keys])].slice(-200);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("hr-reviewed-batches", JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
