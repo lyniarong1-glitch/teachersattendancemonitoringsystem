@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CloudOff, RefreshCw, Search, Send, Wifi } from "lucide-react";
+import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -27,20 +27,6 @@ import {
   TIME_SLOTS,
   formatTime,
 } from "@/lib/attendance-constants";
-import {
-  cacheGet,
-  cacheSet,
-  dequeue,
-  enqueue,
-  loadDrafts,
-  loadQueue,
-  localDateTime,
-  newClientUuid,
-  saveDrafts,
-  type DraftsByDepartment,
-  type OfflineRow,
-  type PendingRecord,
-} from "@/lib/offline-store";
 
 export const Route = createFileRoute("/_authenticated/sa")({
   head: () => ({
@@ -49,19 +35,26 @@ export const Route = createFileRoute("/_authenticated/sa")({
       {
         name: "description",
         content:
-          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet — online or offline.",
+          "Log room assignment, time in, time out, attendance status and remarks for every teacher in a department roster sheet.",
       },
       { property: "og:title", content: "Student Assistant Attendance Entry" },
       {
         property: "og:description",
-        content: "Record faculty attendance offline and sync it to the HR master table when back online.",
+        content: "Log faculty attendance records that sync straight to the HR master table.",
       },
     ],
   }),
   component: SAModule,
 });
 
-type RowState = OfflineRow;
+type RowState = {
+  room_assignment: string;
+  time_arrival: string;
+  time_out: string;
+  attendance_status: string;
+  remarks: string;
+  other_remark: string;
+};
 
 const EMPTY_ROW: RowState = {
   room_assignment: "",
@@ -72,91 +65,36 @@ const EMPTY_ROW: RowState = {
   other_remark: "",
 };
 
-type Dept = { id: string; name: string };
-type Teacher = { id: string; full_name: string };
-
 function SAModule() {
   const { user, role, fullName } = useSession();
   const queryClient = useQueryClient();
   const [departmentId, setDepartmentId] = useState("");
-  const [search, setSearch] = useState("");
-  const [drafts, setDrafts] = useState<DraftsByDepartment>({});
-  const [pending, setPending] = useState<PendingRecord[]>([]);
-  const [online, setOnline] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const hydratedFor = useRef<string | null>(null);
+  const [rows, setRows] = useState<Record<string, RowState>>({});
 
-  const rows = drafts[departmentId] ?? {};
-
-  // Load locally-saved drafts + pending queue once the user is known.
-  useEffect(() => {
-    if (!user || hydratedFor.current === user.id) return;
-    hydratedFor.current = user.id;
-    setDrafts(loadDrafts(user.id));
-    setPending(loadQueue(user.id));
-  }, [user]);
-
-  useEffect(() => {
-    setOnline(navigator.onLine);
-    const up = () => setOnline(true);
-    const down = () => setOnline(false);
-    window.addEventListener("online", up);
-    window.addEventListener("offline", down);
-    return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
-    };
-  }, []);
-
-  const setRow = (id: string, patch: Partial<RowState>) => {
-    if (!departmentId) return;
-    setDrafts((prev) => {
-      const dept = { ...(prev[departmentId] ?? {}) };
-      dept[id] = { ...EMPTY_ROW, ...dept[id], ...patch };
-      const next = { ...prev, [departmentId]: dept };
-      if (user) saveDrafts(user.id, next);
-      return next;
-    });
-  };
+  const setRow = (id: string, patch: Partial<RowState>) =>
+    setRows((r) => ({ ...r, [id]: { ...EMPTY_ROW, ...r[id], ...patch } }));
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase.from("departments").select("id, name").order("name");
-        if (error) throw error;
-        cacheSet("departments", data);
-        return data as Dept[];
-      } catch (e) {
-        const cached = cacheGet<Dept[]>("departments");
-        if (cached) return cached;
-        throw e;
-      }
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
+      if (error) throw error;
+      return data;
     },
-    initialData: () => cacheGet<Dept[]>("departments") ?? undefined,
   });
 
   const { data: teachers = [] } = useQuery({
     queryKey: ["teachers", departmentId],
     enabled: !!departmentId,
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("teachers")
-          .select("id, full_name")
-          .eq("department_id", departmentId)
-          .order("full_name");
-        if (error) throw error;
-        cacheSet(`teachers:${departmentId}`, data);
-        return data as Teacher[];
-      } catch (e) {
-        const cached = cacheGet<Teacher[]>(`teachers:${departmentId}`);
-        if (cached) return cached;
-        throw e;
-      }
+      const { data, error } = await supabase
+        .from("teachers")
+        .select("id, full_name")
+        .eq("department_id", departmentId)
+        .order("full_name");
+      if (error) throw error;
+      return data;
     },
-    initialData: () =>
-      departmentId ? (cacheGet<Teacher[]>(`teachers:${departmentId}`) ?? undefined) : undefined,
   });
 
   const { data: mine = [] } = useQuery({
@@ -175,140 +113,43 @@ function SAModule() {
     },
   });
 
-  const visibleTeachers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return teachers;
-    return teachers.filter((t) => t.full_name.toLowerCase().includes(q));
-  }, [teachers, search]);
-
-  const isComplete = (r?: RowState) => {
-    if (!r) return false;
-    if (!r.room_assignment || !r.attendance_status) return false;
-    if (r.attendance_status !== "Absent" && (!r.time_arrival || !r.time_out)) return false;
-    return true;
-  };
-
-  // Ready rows are computed from the full roster, never from the search view,
-  // so filtering can never drop a recorded row.
   const readyRows = useMemo(
-    () => teachers.filter((t) => isComplete(rows[t.id])),
+    () =>
+      teachers.filter((t) => {
+        const r = rows[t.id];
+        if (!r) return false;
+        if (!r.room_assignment || !r.attendance_status) return false;
+        if (r.attendance_status !== "Absent" && (!r.time_arrival || !r.time_out)) return false;
+        return true;
+      }),
     [teachers, rows],
   );
-
-  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
-
-  const pushToServer = useCallback(
-    async (records: PendingRecord[]) => {
-      const payload = records.map((r) => ({
-        client_uuid: r.client_uuid,
-        teacher_id: r.teacher_id,
-        department_id: r.department_id,
-        submitted_by: r.submitted_by,
-        room_assignment: r.room_assignment,
-        time_arrival: r.time_arrival,
-        time_out: r.time_out,
-        attendance_status: r.attendance_status,
-        remarks: r.remarks,
-        date_submitted: r.date_submitted,
-        time_submitted: r.time_submitted,
-      }));
-      // Duplicate-safe: the server ignores records whose client reference already exists.
-      const { error } = await supabase
-        .from("attendance_records")
-        .upsert(payload, { onConflict: "client_uuid", ignoreDuplicates: true });
-      if (error) throw error;
-    },
-    [],
-  );
-
-  const syncPending = useCallback(
-    async (silent = false) => {
-      if (!user) return;
-      const queue = loadQueue(user.id);
-      if (queue.length === 0) {
-        if (!silent) toast.info("Nothing to sync — all records are already submitted.");
-        return;
-      }
-      if (!navigator.onLine) {
-        if (!silent) toast.error("Still offline. Your records stay saved on this device.");
-        return;
-      }
-      setSyncing(true);
-      try {
-        await pushToServer(queue);
-        setPending(dequeue(user.id, queue.map((r) => r.client_uuid)));
-        void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-        toast.success(`${queue.length} saved record${queue.length === 1 ? "" : "s"} synced`);
-      } catch (e) {
-        if (!silent) toast.error(`Sync failed: ${(e as Error).message}. Records are still saved locally.`);
-      } finally {
-        setSyncing(false);
-      }
-    },
-    [user, pushToServer, queryClient],
-  );
-
-  // Auto-sync as soon as the connection comes back.
-  useEffect(() => {
-    if (online && pending.length > 0) void syncPending(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
-      const stamp = localDateTime();
-      const records: PendingRecord[] = readyRows.map((t) => {
+      const payload = readyRows.map((t) => {
         const r = rows[t.id]!;
         return {
-          client_uuid: newClientUuid(),
           teacher_id: t.id,
-          teacher_name: t.full_name,
           department_id: departmentId,
-          department_name: departmentName,
           submitted_by: user.id,
           room_assignment: r.room_assignment,
           time_arrival: r.time_arrival || null,
           time_out: r.time_out || null,
           attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
-          remarks: r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
-          ...stamp,
-          saved_at: new Date().toISOString(),
+          remarks:
+            r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
         };
       });
-      if (records.length === 0) throw new Error("No completed rows to submit");
-
-      // Always persist locally first so nothing can be lost.
-      const queue = enqueue(user.id, records);
-      setPending(queue);
-      // Clear only the rows that were captured into the queue.
-      setDrafts((prev) => {
-        const dept = { ...(prev[departmentId] ?? {}) };
-        for (const r of records) delete dept[r.teacher_id];
-        const next = { ...prev, [departmentId]: dept };
-        saveDrafts(user.id, next);
-        return next;
-      });
-
-      if (!navigator.onLine) return { count: records.length, offline: true };
-
-      try {
-        await pushToServer(records);
-        setPending(dequeue(user.id, records.map((r) => r.client_uuid)));
-        return { count: records.length, offline: false };
-      } catch {
-        return { count: records.length, offline: true };
-      }
+      const { error } = await supabase.from("attendance_records").insert(payload);
+      if (error) throw error;
+      return payload.length;
     },
-    onSuccess: ({ count, offline }) => {
+    onSuccess: (count) => {
+      setRows({});
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      if (offline) {
-        toast.success(
-          `${count} record${count === 1 ? "" : "s"} saved on this device — they will sync when you're back online.`,
-        );
-      } else {
-        toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
-      }
+      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -328,59 +169,31 @@ function SAModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant={online ? "secondary" : "destructive"} className="gap-1">
-            {online ? <Wifi className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-            {online ? "Online" : "Offline mode"}
-          </Badge>
-          {pending.length > 0 && (
-            <>
-              <Badge variant="outline">
-                {pending.length} record{pending.length === 1 ? "" : "s"} saved on this device
-              </Badge>
-              <Button size="sm" variant="outline" disabled={syncing} onClick={() => void syncPending()}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Syncing…" : "Sync now"}
-              </Button>
-            </>
-          )}
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Pick a department, fill in the rows you observed, then submit. Entries are saved on this
-              device automatically — you can work offline and switch departments without losing them.
+              Pick a department, fill in the rows you observed, then submit. Your account ID and an
+              exact timestamp are attached automatically.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="flex flex-wrap gap-4">
-              <div className="w-full max-w-xs space-y-2">
-                <Label>Department</Label>
-                <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
-                  <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                  <SelectContent>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-full max-w-xs space-y-2">
-                <Label htmlFor="teacher-search">Search teacher</Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="teacher-search"
-                    className="pl-9"
-                    placeholder="Type a teacher's name"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    disabled={!departmentId}
-                  />
-                </div>
-              </div>
+            <div className="max-w-xs space-y-2">
+              <Label>Department</Label>
+              <Select
+                value={departmentId}
+                onValueChange={(v) => {
+                  setDepartmentId(v);
+                  setRows({});
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {departmentId && (
@@ -416,14 +229,7 @@ function SAModule() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleTeachers.length === 0 && (
-                      <tr>
-                        <td colSpan={8} className="border border-border px-3 py-6 text-center text-muted-foreground">
-                          No teacher matches “{search}”.
-                        </td>
-                      </tr>
-                    )}
-                    {visibleTeachers.map((t) => {
+                    {teachers.map((t) => {
                       const r = rows[t.id] ?? EMPTY_ROW;
                       return (
                         <tr key={t.id} className="align-top">
@@ -527,53 +333,6 @@ function SAModule() {
           </CardContent>
         </Card>
 
-        {pending.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Saved on This Device (not yet synced)</CardTitle>
-              <CardDescription>
-                These records are kept exactly as you recorded them and will be sent to HR once synced.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full min-w-[900px] border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-secondary/60">
-                      <th className="border border-border px-3 py-2 text-left">Date Recorded</th>
-                      <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
-                      <th className="border border-border px-3 py-2 text-left">Department</th>
-                      <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
-                      <th className="border border-border px-3 py-2 text-left">Time In</th>
-                      <th className="border border-border px-3 py-2 text-left">Time Out</th>
-                      <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
-                      <th className="border border-border px-3 py-2 text-left">Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pending.map((r) => (
-                      <tr key={r.client_uuid}>
-                        <td className="border border-border px-3 py-2">
-                          {r.date_submitted} {formatTime(r.time_submitted.slice(0, 5))}
-                        </td>
-                        <td className="border border-border px-3 py-2 font-medium">{r.teacher_name}</td>
-                        <td className="border border-border px-3 py-2">{r.department_name}</td>
-                        <td className="border border-border px-3 py-2">{r.room_assignment}</td>
-                        <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
-                        <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
-                        <td className="border border-border px-3 py-2">
-                          <Badge variant="secondary">{r.attendance_status}</Badge>
-                        </td>
-                        <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">My Recent Submissions</CardTitle>
@@ -635,3 +394,4 @@ function SAModule() {
     </div>
   );
 }
+

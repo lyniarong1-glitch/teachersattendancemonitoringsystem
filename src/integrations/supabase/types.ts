@@ -10,14 +10,13 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
       attendance_records: {
         Row: {
           attendance_status: Database["public"]["Enums"]["attendance_status"]
-          client_uuid: string | null
           created_at: string
           date_submitted: string
           department_id: string
@@ -27,8 +26,6 @@ export type Database = {
           remarks: string | null
           room_assignment: string
           submitted_by: string | null
-          submitted_by_id_number: string | null
-          submitted_by_name: string | null
           teacher_id: string
           time_arrival: string | null
           time_out: string | null
@@ -36,7 +33,6 @@ export type Database = {
         }
         Insert: {
           attendance_status: Database["public"]["Enums"]["attendance_status"]
-          client_uuid?: string | null
           created_at?: string
           date_submitted?: string
           department_id: string
@@ -46,8 +42,6 @@ export type Database = {
           remarks?: string | null
           room_assignment: string
           submitted_by?: string | null
-          submitted_by_id_number?: string | null
-          submitted_by_name?: string | null
           teacher_id: string
           time_arrival?: string | null
           time_out?: string | null
@@ -55,7 +49,6 @@ export type Database = {
         }
         Update: {
           attendance_status?: Database["public"]["Enums"]["attendance_status"]
-          client_uuid?: string | null
           created_at?: string
           date_submitted?: string
           department_id?: string
@@ -65,8 +58,6 @@ export type Database = {
           remarks?: string | null
           room_assignment?: string
           submitted_by?: string | null
-          submitted_by_id_number?: string | null
-          submitted_by_name?: string | null
           teacher_id?: string
           time_arrival?: string | null
           time_out?: string | null
