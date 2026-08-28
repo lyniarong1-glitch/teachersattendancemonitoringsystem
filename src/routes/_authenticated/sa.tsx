@@ -432,16 +432,17 @@ function SAModule() {
 
             <div className="flex justify-start pt-2">
               <Button
-                className="min-w-32"
+                className="min-w-56"
                 disabled={readyRows.length === 0 || submit.isPending}
                 onClick={() => submit.mutate()}
               >
                 <Send className="mr-2 h-4 w-4" />
                 {submit.isPending
-                  ? "Submitting…"
-                  : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
+                  ? "Submitting to HR…"
+                  : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"} to HR`}
               </Button>
             </div>
+
           </CardContent>
         </Card>
 
