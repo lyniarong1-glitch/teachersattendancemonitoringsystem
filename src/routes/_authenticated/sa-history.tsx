@@ -51,14 +51,17 @@ function SAHistory() {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["my-records", user?.id],
     enabled: !!user,
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
         .select(
           "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
         )
+        .eq("submitted_by", user!.id)
         .order("date_submitted", { ascending: false })
-        .order("time_submitted", { ascending: false });
+        .order("time_submitted", { ascending: false })
+        .range(0, 4999);
       if (error) throw error;
       return data as unknown as HistoryRow[];
     },
@@ -77,6 +80,7 @@ function SAHistory() {
   const pageCount = Math.max(1, Math.ceil(groups.length / DATES_PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);
   const visible = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+
 
   if (role && role !== "student_assistant") {
     return (
