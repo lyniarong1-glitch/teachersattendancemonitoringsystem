@@ -601,66 +601,6 @@ function SAModule() {
           </Card>
         )}
 
-        <Card id="submission-history" className="scroll-mt-24">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">My Recent Submission History</CardTitle>
-            <CardDescription>
-              {mine.length} submitted record{mine.length === 1 ? "" : "s"}, grouped by the date they
-              were submitted (most recent first).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {mine.length === 0 && (
-              <p className="text-muted-foreground">No records submitted yet.</p>
-            )}
-            {historyGroups.map(([date, rowsForDate]) => (
-              <section key={date} className="space-y-2">
-                <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                  Date Submitted: {date} · {rowsForDate.length} record
-                  {rowsForDate.length === 1 ? "" : "s"}
-                </div>
-                <div className="overflow-x-auto rounded-md border border-border">
-                  <table className="w-full min-w-[900px] border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-secondary/60">
-                        <th className="border border-border px-3 py-2 text-left">Time Submitted</th>
-                        <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
-                        <th className="border border-border px-3 py-2 text-left">Department</th>
-                        <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
-                        <th className="border border-border px-3 py-2 text-left">Time In</th>
-                        <th className="border border-border px-3 py-2 text-left">Time Out</th>
-                        <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
-                        <th className="border border-border px-3 py-2 text-left">Remarks</th>
-                        <th className="border border-border px-3 py-2 text-left">Submitted By</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rowsForDate.map((r) => (
-                        <tr key={r.id}>
-                          <td className="border border-border px-3 py-2">
-                            {formatTime(r.time_submitted?.slice(0, 5))}
-                          </td>
-                          <td className="border border-border px-3 py-2 font-medium">
-                            {r.teachers?.full_name}
-                          </td>
-                          <td className="border border-border px-3 py-2">{r.departments?.name}</td>
-                          <td className="border border-border px-3 py-2">{r.room_assignment}</td>
-                          <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
-                          <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
-                          <td className="border border-border px-3 py-2">
-                            <Badge variant="secondary">{r.attendance_status}</Badge>
-                          </td>
-                          <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
-                          <td className="border border-border px-3 py-2">{fullName}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ))}
-          </CardContent>
-        </Card>
 
 
       </main>
