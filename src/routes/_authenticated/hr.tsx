@@ -494,13 +494,21 @@ function HRModule() {
               const date = key.split("|")[0]!;
               const time = key.split("|")[1]!;
               const submitter = rows[0]?.profiles?.full_name ?? "Unknown";
+              const isReviewed = reviewedKeys.includes(key);
               return (
-              <section key={key} className="space-y-2">
+              <section
+                key={key}
+                className={`space-y-2 rounded-md ${key === highlightKey ? "ring-2 ring-primary p-2" : ""}`}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                    Date Submitted: {date} · {formatTimeExact(time)} · {submitter} · {rows.length}{" "}
-                    record{rows.length === 1 ? "" : "s"}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
+                      Date Submitted: {date} · {formatTimeExact(time)} · {submitter} · {rows.length}{" "}
+                      record{rows.length === 1 ? "" : "s"}
+                    </div>
+                    {isReviewed && <Badge variant="secondary">Reviewed &amp; recorded</Badge>}
                   </div>
+
                   <div className="no-print flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => exportCsv(date, rows)}>
                       <Download className="mr-2 h-4 w-4" /> Export Excel
