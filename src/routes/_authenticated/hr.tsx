@@ -130,6 +130,35 @@ function HRModule() {
     },
   });
 
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["submission-notifications"],
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("submission_notifications")
+        .select("id, submitted_by, submitted_by_name, department_name, record_count, submitted_at, read_at")
+        .order("submitted_at", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const unreadCount = notifications.filter((n) => !n.read_at).length;
+
+  const markRead = useMutation({
+    mutationFn: async (id?: string) => {
+      const query = supabase
+        .from("submission_notifications")
+        .update({ read_at: new Date().toISOString() })
+        .is("read_at", null);
+      const { error } = id ? await query.eq("id", id) : await query;
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["submission-notifications"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const { data: saProfile } = useQuery({
     queryKey: ["sa-profile", saView],
     enabled: !!saView,
