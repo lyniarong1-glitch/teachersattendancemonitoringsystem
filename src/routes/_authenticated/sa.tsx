@@ -378,10 +378,10 @@ function SAModule() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
+              <div className="flex items-center gap-3 rounded-md border-2 border-foreground bg-secondary px-3 py-2 text-secondary-foreground">
                 <Label className="whitespace-nowrap uppercase">Select Department:</Label>
-                <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
-                  <SelectTrigger className="h-9 w-48 border-0 shadow-none focus:ring-0">
+                <Select value={departmentId} onValueChange={(v) => { setDepartmentId(v); setRosterPage(1); }}>
+                  <SelectTrigger className="h-9 w-48 border-0 bg-transparent shadow-none focus:ring-0">
                     <SelectValue placeholder="All departments" />
                   </SelectTrigger>
                   <SelectContent>
@@ -391,7 +391,7 @@ function SAModule() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
+              <div className="flex items-center gap-3 rounded-md border-2 border-foreground bg-secondary px-3 py-2 text-secondary-foreground">
                 <Label htmlFor="teacher-search" className="whitespace-nowrap uppercase">
                   Search Teachers Name:
                 </Label>
@@ -399,11 +399,13 @@ function SAModule() {
                   <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="teacher-search"
-                    className="h-9 w-48 border-0 pl-8 shadow-none focus-visible:ring-0"
+                    className="h-9 w-48 border-0 bg-transparent pl-8 shadow-none focus-visible:ring-0"
                     placeholder="Type a teacher's name"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setRosterPage(1); }}
                   />
+                </div>
+
                 </div>
               </div>
             </div>
