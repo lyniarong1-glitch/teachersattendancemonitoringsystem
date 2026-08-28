@@ -699,7 +699,15 @@ function HRModule() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!batchView} onOpenChange={(o) => !o && setBatchView(null)}>
+      <Dialog
+        open={!!batchView}
+        onOpenChange={(o) => {
+          if (!o) {
+            setBatchView(null);
+            toast.success("Reviewed batch recorded in the Master Attendance Table");
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
