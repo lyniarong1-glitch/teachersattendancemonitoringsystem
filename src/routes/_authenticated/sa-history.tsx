@@ -75,22 +75,25 @@ function SAHistory() {
     },
   });
 
-  const groups = useMemo(() => {
+  // Each submission batch (same date + exact submission time) stays its own table —
+  // newly submitted records are never mixed with older submissions.
+  const batches = useMemo(() => {
     const map = new Map<string, HistoryRow[]>();
     for (const r of rows) {
-      const list = map.get(r.date_submitted);
+      const key = `${r.date_submitted}T${r.time_submitted}`;
+      const list = map.get(key);
       if (list) list.push(r);
-      else map.set(r.date_submitted, [r]);
+      else map.set(key, [r]);
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => (b.time_submitted ?? "").localeCompare(a.time_submitted ?? ""));
-    }
-    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    return [...map.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, group]) => ({ key, group, date: group[0]!.date_submitted, time: group[0]!.time_submitted }));
   }, [rows]);
 
-  const pageCount = Math.max(1, Math.ceil(groups.length / DATES_PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(batches.length / DATES_PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);
-  const visible = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+  const visible = batches.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+
 
 
 
@@ -113,21 +116,24 @@ function SAHistory() {
           <CardHeader>
             <CardTitle>My Recent History</CardTitle>
             <CardDescription>
-              {rows.length} submitted record{rows.length === 1 ? "" : "s"} in {groups.length} date
-              group{groups.length === 1 ? "" : "s"}.
+              {rows.length} submitted record{rows.length === 1 ? "" : "s"} in {batches.length}{" "}
+              submission{batches.length === 1 ? "" : "s"} — newest first, each submission kept
+              separate.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoading && <p className="text-muted-foreground">Loading your history…</p>}
-            {!isLoading && groups.length === 0 && (
+            {!isLoading && batches.length === 0 && (
               <p className="text-muted-foreground">No records submitted yet.</p>
             )}
 
-            {visible.map(([date, group]) => (
-              <section key={date} className="space-y-2">
+            {visible.map(({ key, group, date, time }) => (
+              <section key={key} className="space-y-2">
                 <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-bold uppercase tracking-wide">
-                  Date Submitted: {date} · {group.length} record{group.length === 1 ? "" : "s"}
+                  Date Submitted: {date} · {formatTime(time?.slice(0, 5))} · {group.length} record
+                  {group.length === 1 ? "" : "s"}
                 </div>
+
                 <div className="overflow-x-auto rounded-md border border-border">
                   <table className="w-full min-w-[900px] border-collapse text-sm">
                     <thead>
@@ -169,7 +175,7 @@ function SAHistory() {
               </section>
             ))}
 
-            {groups.length > 0 && (
+            {batches.length > 0 && (
               <div className="flex items-center justify-between gap-3">
                 <Button
                   variant="outline"
