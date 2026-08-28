@@ -75,22 +75,25 @@ function SAHistory() {
     },
   });
 
-  const groups = useMemo(() => {
+  // Each submission batch (same date + exact submission time) stays its own table —
+  // newly submitted records are never mixed with older submissions.
+  const batches = useMemo(() => {
     const map = new Map<string, HistoryRow[]>();
     for (const r of rows) {
-      const list = map.get(r.date_submitted);
+      const key = `${r.date_submitted}T${r.time_submitted}`;
+      const list = map.get(key);
       if (list) list.push(r);
-      else map.set(r.date_submitted, [r]);
+      else map.set(key, [r]);
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => (b.time_submitted ?? "").localeCompare(a.time_submitted ?? ""));
-    }
-    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    return [...map.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, group]) => ({ key, group, date: group[0]!.date_submitted, time: group[0]!.time_submitted }));
   }, [rows]);
 
-  const pageCount = Math.max(1, Math.ceil(groups.length / DATES_PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(batches.length / DATES_PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);
-  const visible = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+  const visible = batches.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+
 
 
 
