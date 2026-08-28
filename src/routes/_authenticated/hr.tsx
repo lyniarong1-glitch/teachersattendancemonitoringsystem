@@ -222,6 +222,23 @@ function HRModule() {
       );
   }, [records, teacherView]);
 
+  const newRecords = useMemo(
+    () => (seenAt ? records.filter((r) => r.created_at > seenAt) : []),
+    [records, seenAt],
+  );
+
+  const removeSa = useMutation({
+    mutationFn: (userId: string) => deleteStudentAssistant({ data: { userId } }),
+    onSuccess: () => {
+      setDeleteSa(null);
+      setSaView(null);
+      void queryClient.invalidateQueries({ queryKey: ["all-records"] });
+      toast.success("Student Assistant account deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
       if (!user) throw new Error("Not signed in");
