@@ -17,6 +17,7 @@ export type Database = {
       attendance_records: {
         Row: {
           attendance_status: Database["public"]["Enums"]["attendance_status"]
+          client_uuid: string | null
           created_at: string
           date_submitted: string
           department_id: string
@@ -33,6 +34,7 @@ export type Database = {
         }
         Insert: {
           attendance_status: Database["public"]["Enums"]["attendance_status"]
+          client_uuid?: string | null
           created_at?: string
           date_submitted?: string
           department_id: string
@@ -49,6 +51,7 @@ export type Database = {
         }
         Update: {
           attendance_status?: Database["public"]["Enums"]["attendance_status"]
+          client_uuid?: string | null
           created_at?: string
           date_submitted?: string
           department_id?: string

@@ -1,0 +1,2 @@
+ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS client_uuid uuid;
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_records_client_uuid_key ON public.attendance_records (client_uuid) WHERE client_uuid IS NOT NULL;
