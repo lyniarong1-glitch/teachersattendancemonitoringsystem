@@ -526,16 +526,18 @@ function SAModule() {
             ))}
 
 
-            <Button
-              className="w-full sm:w-auto"
-              disabled={readyRows.length === 0 || submit.isPending}
-              onClick={() => submit.mutate()}
-            >
-              <Send className="mr-2 h-4 w-4" />
-              {submit.isPending
-                ? "Submitting…"
-                : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
-            </Button>
+            <div className="flex justify-start pt-2">
+              <Button
+                className="min-w-32"
+                disabled={readyRows.length === 0 || submit.isPending}
+                onClick={() => submit.mutate()}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {submit.isPending
+                  ? "Submitting…"
+                  : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
