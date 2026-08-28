@@ -226,11 +226,14 @@ function HRModule() {
   }, [records, department, search]);
 
   const groups = useMemo(() => {
+    // One section per submission batch (date + exact time + submitter) so a new
+    // submission is never merged into an older one.
     const map = new Map<string, RecordRow[]>();
     for (const r of filtered) {
-      const list = map.get(r.date_submitted);
+      const key = `${r.date_submitted}|${r.time_submitted}|${r.submitted_by ?? "unknown"}`;
+      const list = map.get(key);
       if (list) list.push(r);
-      else map.set(r.date_submitted, [r]);
+      else map.set(key, [r]);
     }
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [filtered]);
