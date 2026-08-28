@@ -203,19 +203,13 @@ function SAModule() {
       });
       if (records.length === 0) throw new Error("No completed rows to submit");
 
-      // Duplicate-safe: the server ignores records whose client reference already exists.
-      const { error } = await supabase
+      // Each submission carries a fresh client reference, so a plain insert is
+      // duplicate-safe and returns exactly what the server stored.
+      const { data: saved, error } = await supabase
         .from("attendance_records")
-        .upsert(records, { onConflict: "client_uuid", ignoreDuplicates: true });
+        .insert(records)
+        .select("client_uuid, teacher_id, department_id");
       if (error) throw error;
-
-      // Read back exactly what was stored, so drafts are only cleared for rows
-      // that are confirmed saved on the server with the values as recorded.
-      const { data: saved, error: verifyError } = await supabase
-        .from("attendance_records")
-        .select("client_uuid, teacher_id, department_id")
-        .in("client_uuid", records.map((r) => r.client_uuid));
-      if (verifyError) throw verifyError;
 
       const confirmed = saved ?? [];
       if (confirmed.length === 0) throw new Error("Submission could not be confirmed — nothing was cleared");
