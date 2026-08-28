@@ -74,6 +74,7 @@ export const Route = createFileRoute("/_authenticated/hr")({
 
 type RecordRow = {
   id: string;
+  created_at: string;
   room_assignment: string;
   time_arrival: string | null;
   time_out: string | null;
@@ -91,6 +92,8 @@ type RecordRow = {
 };
 
 const DATES_PER_PAGE = 3;
+const SEEN_KEY = "tams:hr:records-seen-at";
+
 
 function statusVariant(s: RecordRow["attendance_status"]) {
   return s === "Present" ? "default" : s === "Late" ? "secondary" : "destructive";
