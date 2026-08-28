@@ -335,32 +335,14 @@ function SAModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant={online ? "secondary" : "destructive"} className="gap-1">
-            {online ? <Wifi className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-            {online ? "Online" : "Offline mode"}
-          </Badge>
-          {pending.length > 0 && (
-            <>
-              <Badge variant="outline">
-                {pending.length} record{pending.length === 1 ? "" : "s"} saved on this device
-              </Badge>
-              <Button size="sm" variant="outline" disabled={syncing} onClick={() => void syncPending()}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Syncing…" : "Sync now"}
-              </Button>
-            </>
-          )}
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Entries are saved on this device automatically, so you can work offline and switch
-              departments without losing anything.
+              Completed rows are submitted straight to HR exactly as you recorded them.
             </CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
