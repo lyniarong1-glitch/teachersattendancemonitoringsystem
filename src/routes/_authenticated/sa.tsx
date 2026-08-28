@@ -261,13 +261,13 @@ function SAModule() {
       if (!user) throw new Error("Not signed in");
       const stamp = localDateTime();
       const records: PendingRecord[] = readyRows.map((t) => {
-        const r = rows[t.id]!;
+        const r = drafts[t.department_id]![t.id]!;
         return {
           client_uuid: newClientUuid(),
           teacher_id: t.id,
           teacher_name: t.full_name,
-          department_id: departmentId,
-          department_name: departmentName,
+          department_id: t.department_id,
+          department_name: deptName(t.department_id),
           submitted_by: user.id,
           room_assignment: r.room_assignment,
           time_arrival: r.time_arrival || null,
@@ -283,14 +283,18 @@ function SAModule() {
       // Always persist locally first so nothing can be lost.
       const queue = enqueue(user.id, records);
       setPending(queue);
-      // Clear only the rows that were captured into the queue.
+      // Clear only the rows that were captured into the queue, in every department.
       setDrafts((prev) => {
-        const dept = { ...(prev[departmentId] ?? {}) };
-        for (const r of records) delete dept[r.teacher_id];
-        const next = { ...prev, [departmentId]: dept };
+        const next: DraftsByDepartment = { ...prev };
+        for (const r of records) {
+          const dept = { ...(next[r.department_id] ?? {}) };
+          delete dept[r.teacher_id];
+          next[r.department_id] = dept;
+        }
         saveDrafts(user.id, next);
         return next;
       });
+
 
       if (!navigator.onLine) return { count: records.length, offline: true };
 
