@@ -100,10 +100,18 @@ type RecordRow = {
   teacher_id: string;
   department_id: string;
   submitted_by: string | null;
+  submitted_by_name: string | null;
+  submitted_by_id_number: string | null;
   teachers: { full_name: string } | null;
   departments: { name: string } | null;
   profiles: { full_name: string } | null;
 };
+
+/** Name of the SA who submitted a record — falls back to the stored snapshot
+ *  so deleted accounts keep their attribution. */
+function submitterName(r: RecordRow) {
+  return r.profiles?.full_name ?? r.submitted_by_name ?? "—";
+}
 
 const DATES_PER_PAGE = 3;
 const SEEN_KEY = "tams:hr:records-seen-at";
