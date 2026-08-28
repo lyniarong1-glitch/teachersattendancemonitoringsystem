@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { History, Home, LogOut, Menu, Trash2, UserRound } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { History, Home, LogOut, Menu, UserRound } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import dccSeal from "@/assets/dcc-seal.jpg.asset.json";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteMyAccount } from "@/lib/account.functions";
 import { Button } from "@/components/ui/button";
 import { AccountDialog } from "@/components/AccountDialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export function AppHeader({ name, role, userId, isSA = false }: { name: string; role: string; userId?: string | undefined; isSA?: boolean | undefined }) {
