@@ -10,13 +10,14 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
       attendance_records: {
         Row: {
           attendance_status: Database["public"]["Enums"]["attendance_status"]
+          client_uuid: string | null
           created_at: string
           date_submitted: string
           department_id: string
@@ -26,6 +27,8 @@ export type Database = {
           remarks: string | null
           room_assignment: string
           submitted_by: string | null
+          submitted_by_id_number: string | null
+          submitted_by_name: string | null
           teacher_id: string
           time_arrival: string | null
           time_out: string | null
@@ -33,6 +36,7 @@ export type Database = {
         }
         Insert: {
           attendance_status: Database["public"]["Enums"]["attendance_status"]
+          client_uuid?: string | null
           created_at?: string
           date_submitted?: string
           department_id: string
@@ -42,6 +46,8 @@ export type Database = {
           remarks?: string | null
           room_assignment: string
           submitted_by?: string | null
+          submitted_by_id_number?: string | null
+          submitted_by_name?: string | null
           teacher_id: string
           time_arrival?: string | null
           time_out?: string | null
@@ -49,6 +55,7 @@ export type Database = {
         }
         Update: {
           attendance_status?: Database["public"]["Enums"]["attendance_status"]
+          client_uuid?: string | null
           created_at?: string
           date_submitted?: string
           department_id?: string
@@ -58,6 +65,8 @@ export type Database = {
           remarks?: string | null
           room_assignment?: string
           submitted_by?: string | null
+          submitted_by_id_number?: string | null
+          submitted_by_name?: string | null
           teacher_id?: string
           time_arrival?: string | null
           time_out?: string | null
@@ -170,6 +179,50 @@ export type Database = {
           street?: string | null
         }
         Relationships: []
+      }
+      submission_notifications: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          department_name: string | null
+          id: string
+          read_at: string | null
+          record_count: number
+          submitted_at: string
+          submitted_by: string | null
+          submitted_by_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          department_name?: string | null
+          id?: string
+          read_at?: string | null
+          record_count?: number
+          submitted_at?: string
+          submitted_by?: string | null
+          submitted_by_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          department_name?: string | null
+          id?: string
+          read_at?: string | null
+          record_count?: number
+          submitted_at?: string
+          submitted_by?: string | null
+          submitted_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_notifications_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       teachers: {
         Row: {

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Bell,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -127,6 +128,35 @@ function HRModule() {
       if (error) throw error;
       return data as unknown as RecordRow[];
     },
+  });
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["submission-notifications"],
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("submission_notifications")
+        .select("id, submitted_by, submitted_by_name, department_name, record_count, submitted_at, read_at")
+        .order("submitted_at", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const unreadCount = notifications.filter((n) => !n.read_at).length;
+
+  const markRead = useMutation({
+    mutationFn: async (id?: string) => {
+      const query = supabase
+        .from("submission_notifications")
+        .update({ read_at: new Date().toISOString() })
+        .is("read_at", null);
+      const { error } = id ? await query.eq("id", id) : await query;
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["submission-notifications"] }),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const { data: saProfile } = useQuery({
@@ -258,6 +288,49 @@ function HRModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
+        <Card className="no-print">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              <CardTitle className="text-base">Submission Notifications</CardTitle>
+              {unreadCount > 0 && <Badge variant="destructive">{unreadCount} new</Badge>}
+            </div>
+            {unreadCount > 0 && (
+              <Button variant="outline" size="sm" onClick={() => markRead.mutate(undefined)}>
+                Mark all as read
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {notifications.length === 0 && (
+              <p className="text-sm text-muted-foreground">No submissions yet.</p>
+            )}
+            {notifications.map((n) => (
+              <div
+                key={n.id}
+                className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm ${n.read_at ? "opacity-60" : "bg-secondary/40 font-medium"}`}
+              >
+                <span>
+                  <button
+                    className="underline underline-offset-2"
+                    onClick={() => setSaView(n.submitted_by)}
+                  >
+                    {n.submitted_by_name ?? "Student Assistant"}
+                  </button>{" "}
+                  submitted {n.record_count} attendance record
+                  {n.record_count === 1 ? "" : "s"}
+                  {n.department_name ? ` for ${n.department_name}` : ""} on{" "}
+                  {new Date(n.submitted_at).toLocaleString()}
+                </span>
+                {!n.read_at && (
+                  <Button variant="ghost" size="sm" onClick={() => markRead.mutate(n.id)}>
+                    Mark read
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="no-print">
             <CardTitle>Master Attendance Table</CardTitle>

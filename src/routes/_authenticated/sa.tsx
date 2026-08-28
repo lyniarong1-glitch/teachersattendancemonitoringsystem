@@ -9,7 +9,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -25,7 +25,6 @@ import {
   REMARKS_OPTIONS,
   STATUS_OPTIONS,
   TIME_SLOTS,
-  formatTime,
 } from "@/lib/attendance-constants";
 
 export const Route = createFileRoute("/_authenticated/sa")({
@@ -97,44 +96,24 @@ function SAModule() {
     },
   });
 
-  const { data: mine = [] } = useQuery({
-    queryKey: ["my-records", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
-        )
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data;
-    },
-  });
-
+  // Every teacher with an attendance status checked is submitted — Present, Late or Absent.
   const readyRows = useMemo(
-    () =>
-      teachers.filter((t) => {
-        const r = rows[t.id];
-        if (!r) return false;
-        if (!r.room_assignment || !r.attendance_status) return false;
-        if (r.attendance_status !== "Absent" && (!r.time_arrival || !r.time_out)) return false;
-        return true;
-      }),
+    () => teachers.filter((t) => !!rows[t.id]?.attendance_status),
     [teachers, rows],
   );
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
-      const payload = readyRows.map((t) => {
+      const selected = readyRows;
+      if (selected.length === 0) throw new Error("No attendance status has been checked yet");
+      const payload = selected.map((t) => {
         const r = rows[t.id]!;
         return {
           teacher_id: t.id,
           department_id: departmentId,
           submitted_by: user.id,
-          room_assignment: r.room_assignment,
+          room_assignment: r.room_assignment || "—",
           time_arrival: r.time_arrival || null,
           time_out: r.time_out || null,
           attendance_status: r.attendance_status as "Present" | "Late" | "Absent",
@@ -142,14 +121,32 @@ function SAModule() {
             r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
         };
       });
-      const { error } = await supabase.from("attendance_records").insert(payload);
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .insert(payload)
+        .select("id");
       if (error) throw error;
-      return payload.length;
+      const saved = data?.length ?? 0;
+      if (saved !== payload.length) {
+        throw new Error(
+          `Submission mismatch: ${payload.length} records checked but ${saved} saved. Please review and resubmit.`,
+        );
+      }
+      const departmentName = departments.find((d) => d.id === departmentId)?.name ?? null;
+      const { error: notifyError } = await supabase.from("submission_notifications").insert({
+        submitted_by: user.id,
+        submitted_by_name: fullName,
+        department_id: departmentId,
+        department_name: departmentName,
+        record_count: saved,
+      });
+      if (notifyError) throw notifyError;
+      return saved;
     },
     onSuccess: (count) => {
       setRows({});
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted`);
+      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted to HR`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -320,72 +317,22 @@ function SAModule() {
               </div>
             )}
 
-            <Button
-              className="w-full sm:w-auto"
-              disabled={readyRows.length === 0 || submit.isPending}
-              onClick={() => submit.mutate()}
-            >
-              <Send className="mr-2 h-4 w-4" />
-              {submit.isPending
-                ? "Submitting…"
-                : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">My Recent Submissions</CardTitle>
-            <CardDescription>Most recent submissions first.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full min-w-[900px] border-collapse text-sm">
-                <thead>
-                  <tr className="bg-secondary/60">
-                    <th className="border border-border px-3 py-2 text-left">Date Submitted</th>
-                    <th className="border border-border px-3 py-2 text-left">Teacher's Name</th>
-                    <th className="border border-border px-3 py-2 text-left">Department</th>
-                    <th className="border border-border px-3 py-2 text-left">Room Assigned</th>
-                    <th className="border border-border px-3 py-2 text-left">Time In</th>
-                    <th className="border border-border px-3 py-2 text-left">Time Out</th>
-                    <th className="border border-border px-3 py-2 text-left">Attendance Status</th>
-                    <th className="border border-border px-3 py-2 text-left">Remarks</th>
-                    <th className="border border-border px-3 py-2 text-left">Submitted By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mine.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="border border-border px-3 py-6 text-center text-muted-foreground"
-                      >
-                        No records submitted yet.
-                      </td>
-                    </tr>
-                  )}
-                  {mine.map((r) => (
-                    <tr key={r.id}>
-                      <td className="border border-border px-3 py-2">
-                        {r.date_submitted} {formatTime(r.time_submitted?.slice(0, 5))}
-                      </td>
-                      <td className="border border-border px-3 py-2 font-medium">
-                        {r.teachers?.full_name}
-                      </td>
-                      <td className="border border-border px-3 py-2">{r.departments?.name}</td>
-                      <td className="border border-border px-3 py-2">{r.room_assignment}</td>
-                      <td className="border border-border px-3 py-2">{formatTime(r.time_arrival)}</td>
-                      <td className="border border-border px-3 py-2">{formatTime(r.time_out)}</td>
-                      <td className="border border-border px-3 py-2">
-                        <Badge variant="secondary">{r.attendance_status}</Badge>
-                      </td>
-                      <td className="border border-border px-3 py-2">{r.remarks || "None"}</td>
-                      <td className="border border-border px-3 py-2">{fullName}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                className="w-full sm:w-auto"
+                disabled={readyRows.length === 0 || submit.isPending}
+                onClick={() => submit.mutate()}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {submit.isPending
+                  ? "Submitting…"
+                  : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
+              </Button>
+              <span className="text-sm font-medium text-muted-foreground">
+                {readyRows.length} of {teachers.length} teacher
+                {teachers.length === 1 ? "" : "s"} checked — all checked rows (including Absent) are
+                submitted.
+              </span>
             </div>
           </CardContent>
         </Card>
