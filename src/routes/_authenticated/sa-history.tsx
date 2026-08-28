@@ -53,17 +53,25 @@ function SAHistory() {
     enabled: !!user,
     refetchOnMount: "always",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select(
-          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
-        )
-        .eq("submitted_by", user!.id)
-        .order("date_submitted", { ascending: false })
-        .order("time_submitted", { ascending: false })
-        .range(0, 4999);
-      if (error) throw error;
-      return data as unknown as HistoryRow[];
+      const all: HistoryRow[] = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("attendance_records")
+          .select(
+            "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, teachers(full_name), departments(name)",
+          )
+          .eq("submitted_by", user!.id)
+          .order("date_submitted", { ascending: false })
+          .order("time_submitted", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as unknown as HistoryRow[];
+        all.push(...batch);
+        if (batch.length < PAGE) break;
+      }
+      return all;
     },
   });
 
@@ -74,12 +82,16 @@ function SAHistory() {
       if (list) list.push(r);
       else map.set(r.date_submitted, [r]);
     }
+    for (const list of map.values()) {
+      list.sort((a, b) => (b.time_submitted ?? "").localeCompare(a.time_submitted ?? ""));
+    }
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [rows]);
 
   const pageCount = Math.max(1, Math.ceil(groups.length / DATES_PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);
   const visible = groups.slice(safePage * DATES_PER_PAGE, safePage * DATES_PER_PAGE + DATES_PER_PAGE);
+
 
 
   if (role && role !== "student_assistant") {
