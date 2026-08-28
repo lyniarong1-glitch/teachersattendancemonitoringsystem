@@ -357,18 +357,18 @@ function SAModule() {
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
-              Pick a department — or search a teacher's name across every department — fill in the
-              rows you observed, then submit. Entries are saved on this device automatically, so you
-              can work offline and switch departments without losing anything.
+              Entries are saved on this device automatically, so you can work offline and switch
+              departments without losing anything.
             </CardDescription>
-
           </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex flex-wrap gap-4">
-              <div className="w-full max-w-xs space-y-2">
-                <Label>Department</Label>
+          <CardContent className="space-y-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
+                <Label className="whitespace-nowrap uppercase">Select Department:</Label>
                 <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
-                  <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                  <SelectTrigger className="h-9 w-48 border-0 shadow-none focus:ring-0">
+                    <SelectValue placeholder="All departments" />
+                  </SelectTrigger>
                   <SelectContent>
                     {departments.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -376,13 +376,15 @@ function SAModule() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-full max-w-xs space-y-2">
-                <Label htmlFor="teacher-search">Search teacher (all departments)</Label>
+              <div className="flex items-center gap-3 rounded-md border-2 border-foreground px-3 py-2">
+                <Label htmlFor="teacher-search" className="whitespace-nowrap uppercase">
+                  Search Teachers Name:
+                </Label>
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="teacher-search"
-                    className="pl-9"
+                    className="h-9 w-48 border-0 pl-8 shadow-none focus-visible:ring-0"
                     placeholder="Type a teacher's name"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -391,10 +393,10 @@ function SAModule() {
               </div>
             </div>
 
-
-            {(departmentId || search.trim()) && teacherGroups.length === 0 && (
+            {teacherGroups.length === 0 && (
               <p className="text-muted-foreground">No teacher matches “{search}”.</p>
             )}
+
 
             {teacherGroups.map(([deptId, group]) => (
               <section key={deptId} className="space-y-2">
