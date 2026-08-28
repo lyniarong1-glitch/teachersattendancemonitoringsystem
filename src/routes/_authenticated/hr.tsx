@@ -106,6 +106,14 @@ function HRModule() {
   const [editing, setEditing] = useState<RecordRow | null>(null);
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
   const [saView, setSaView] = useState<string | null>(null);
+  const [batchView, setBatchView] = useState<{
+    id: string;
+    submitted_by: string | null;
+    submitted_by_name: string | null;
+    department_name: string | null;
+    record_count: number;
+    submitted_at: string;
+  } | null>(null);
   const [page, setPage] = useState(0);
 
   const { data: departments = [] } = useQuery({
@@ -158,6 +166,28 @@ function HRModule() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["submission-notifications"] }),
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const { data: batchRecords = [], isLoading: batchLoading } = useQuery({
+    queryKey: ["batch-records", batchView?.id],
+    enabled: !!batchView,
+    queryFn: async () => {
+      const submittedAt = new Date(batchView!.submitted_at);
+      const from = new Date(submittedAt.getTime() - 5 * 60 * 1000).toISOString();
+      const to = new Date(submittedAt.getTime() + 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .select(
+          "id, room_assignment, time_arrival, time_out, attendance_status, remarks, date_submitted, time_submitted, last_edited_at, teacher_id, department_id, submitted_by, teachers(full_name), departments(name), profiles:submitted_by(full_name)",
+        )
+        .eq("submitted_by", batchView!.submitted_by!)
+        .gte("created_at", from)
+        .lte("created_at", to)
+        .order("created_at", { ascending: false })
+        .limit(batchView!.record_count || 500);
+      if (error) throw error;
+      return data as unknown as RecordRow[];
+    },
   });
 
   const { data: saProfile } = useQuery({
@@ -309,12 +339,28 @@ function HRModule() {
             {notifications.map((n) => (
               <div
                 key={n.id}
-                className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm ${n.read_at ? "opacity-60" : "bg-secondary/40 font-medium"}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setBatchView(n);
+                  if (!n.read_at) markRead.mutate(n.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setBatchView(n);
+                    if (!n.read_at) markRead.mutate(n.id);
+                  }
+                }}
+                className={`flex cursor-pointer flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm transition hover:border-primary hover:bg-secondary/60 ${n.read_at ? "opacity-60" : "bg-secondary/40 font-medium"}`}
               >
                 <span>
                   <button
                     className="underline underline-offset-2"
-                    onClick={() => setSaView(n.submitted_by)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSaView(n.submitted_by);
+                    }}
                   >
                     {n.submitted_by_name ?? "Student Assistant"}
                   </button>{" "}
@@ -323,11 +369,21 @@ function HRModule() {
                   {n.department_name ? ` for ${n.department_name}` : ""} on{" "}
                   {new Date(n.submitted_at).toLocaleString()}
                 </span>
-                {!n.read_at && (
-                  <Button variant="ghost" size="sm" onClick={() => markRead.mutate(n.id)}>
-                    Mark read
-                  </Button>
-                )}
+                <span className="flex items-center gap-2">
+                  <Badge variant="outline">Click to review</Badge>
+                  {!n.read_at && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markRead.mutate(n.id);
+                      }}
+                    >
+                      Mark read
+                    </Button>
+                  )}
+                </span>
               </div>
             ))}
           </CardContent>
@@ -573,6 +629,92 @@ function HRModule() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTeacherView(null)}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!batchView} onOpenChange={(o) => !o && setBatchView(null)}>
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Submitted Attendance Records — {batchView?.submitted_by_name ?? "Student Assistant"}
+            </DialogTitle>
+            <DialogDescription>
+              {batchView?.record_count} record{batchView?.record_count === 1 ? "" : "s"}
+              {batchView?.department_name ? ` · ${batchView.department_name}` : ""} · submitted{" "}
+              {batchView ? new Date(batchView.submitted_at).toLocaleString() : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Room</TableHead>
+                  <TableHead>Time In</TableHead>
+                  <TableHead>Time Out</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Remarks</TableHead>
+                  <TableHead>Time Submitted</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {batchLoading && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      Loading records…
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!batchLoading && batchRecords.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      No records found for this submission.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {batchRecords.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <button
+                        className="underline underline-offset-2"
+                        onClick={() => {
+                          setBatchView(null);
+                          setTeacherView({ id: r.teacher_id, name: r.teachers?.full_name ?? "" });
+                        }}
+                      >
+                        {r.teachers?.full_name ?? "—"}
+                      </button>
+                    </TableCell>
+                    <TableCell>{r.departments?.name}</TableCell>
+                    <TableCell>{r.room_assignment}</TableCell>
+                    <TableCell>{formatTime(r.time_arrival)}</TableCell>
+                    <TableCell>{formatTime(r.time_out)}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(r.attendance_status)}>
+                        {r.attendance_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{r.remarks || "None"}</TableCell>
+                    <TableCell>
+                      {r.date_submitted} {formatTimeExact(r.time_submitted)}
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
+                        <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchView(null)}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
             </Button>
           </DialogFooter>
