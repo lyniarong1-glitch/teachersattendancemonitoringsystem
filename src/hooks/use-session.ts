@@ -22,9 +22,20 @@ export function useSession() {
     }
     const [{ data: roleRow }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", nextUser.id).maybeSingle(),
-      supabase.from("profiles").select("full_name").eq("id", nextUser.id).maybeSingle(),
+      supabase.from("profiles").select("full_name, is_active").eq("id", nextUser.id).maybeSingle(),
     ]);
     if (!activeRef.current) return;
+    // Deactivated accounts keep their submitted records but lose system access.
+    if (profile && profile.is_active === false) {
+      toast.error("This account has been deactivated by HR. Please contact the HR office.");
+      await supabase.auth.signOut();
+      if (!activeRef.current) return;
+      setUser(null);
+      setRole(null);
+      setFullName("");
+      setLoading(false);
+      return;
+    }
     setRole((roleRow?.role as AppRole) ?? null);
     setFullName(profile?.full_name ?? nextUser.email ?? "");
     setLoading(false);
