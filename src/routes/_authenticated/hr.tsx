@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { AppHeader } from "@/components/AppHeader";
+import { StudentAssistantList } from "@/components/StudentAssistantList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -369,6 +370,7 @@ function HRModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
+        <StudentAssistantList onView={(id) => setSaView(id)} />
         <Card className="no-print">
           <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
             <div className="flex items-center gap-2">
