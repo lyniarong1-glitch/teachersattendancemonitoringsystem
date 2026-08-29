@@ -369,6 +369,7 @@ function HRModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Human Resources" userId={user?.id} />
       <main className="mx-auto max-w-[95rem] space-y-6 px-4 py-8">
+        <StudentAssistantList onView={(id) => setSaView(id)} />
         <Card className="no-print">
           <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
             <div className="flex items-center gap-2">
