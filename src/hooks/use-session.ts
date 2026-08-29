@@ -22,9 +22,22 @@ export function useSession() {
     }
     const [{ data: roleRow }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", nextUser.id).maybeSingle(),
-      supabase.from("profiles").select("full_name").eq("id", nextUser.id).maybeSingle(),
+      supabase.from("profiles").select("full_name, is_active").eq("id", nextUser.id).maybeSingle(),
     ]);
     if (!activeRef.current) return;
+    if (profile && profile.is_active === false) {
+      await supabase.auth.signOut();
+      if (!activeRef.current) return;
+      setUser(null);
+      setRole(null);
+      setFullName("");
+      setLoading(false);
+      if (typeof window !== "undefined") {
+        const { toast } = await import("sonner");
+        toast.error("This account has been deactivated by HR. Please contact the HR office.");
+      }
+      return;
+    }
     setRole((roleRow?.role as AppRole) ?? null);
     setFullName(profile?.full_name ?? nextUser.email ?? "");
     setLoading(false);
