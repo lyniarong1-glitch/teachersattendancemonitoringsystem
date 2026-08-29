@@ -121,14 +121,12 @@ export type Database = {
           course: string | null
           course_year: string | null
           created_at: string
-          deactivated_at: string | null
           email: string
           first_name: string | null
           full_name: string
           grade_level: string | null
           id: string
           id_number: string | null
-          is_active: boolean
           last_name: string | null
           middle_name: string | null
           mobile_number: string | null
@@ -145,14 +143,12 @@ export type Database = {
           course?: string | null
           course_year?: string | null
           created_at?: string
-          deactivated_at?: string | null
           email: string
           first_name?: string | null
           full_name: string
           grade_level?: string | null
           id: string
           id_number?: string | null
-          is_active?: boolean
           last_name?: string | null
           middle_name?: string | null
           mobile_number?: string | null
@@ -169,14 +165,12 @@ export type Database = {
           course?: string | null
           course_year?: string | null
           created_at?: string
-          deactivated_at?: string | null
           email?: string
           first_name?: string | null
           full_name?: string
           grade_level?: string | null
           id?: string
           id_number?: string | null
-          is_active?: boolean
           last_name?: string | null
           middle_name?: string | null
           mobile_number?: string | null
