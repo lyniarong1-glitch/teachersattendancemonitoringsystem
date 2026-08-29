@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedHrRouteImport } from './routes/_authenticated/hr'
 import { Route as AuthenticatedSaRouteImport } from './routes/_authenticated/sa'
 import { Route as AuthenticatedSaHistoryRouteImport } from './routes/_authenticated/sa-history'
+import { Route as AuthenticatedSaListRouteImport } from './routes/_authenticated/sa-list'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -45,6 +46,11 @@ const AuthenticatedSaHistoryRoute = AuthenticatedSaHistoryRouteImport.update({
   path: '/sa-history',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSaListRoute = AuthenticatedSaListRouteImport.update({
+  id: '/sa-list',
+  path: '/sa-list',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/hr': typeof AuthenticatedHrRoute
   '/sa': typeof AuthenticatedSaRoute
   '/sa-history': typeof AuthenticatedSaHistoryRoute
+  '/sa-list': typeof AuthenticatedSaListRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/hr': typeof AuthenticatedHrRoute
   '/sa': typeof AuthenticatedSaRoute
   '/sa-history': typeof AuthenticatedSaHistoryRoute
+  '/sa-list': typeof AuthenticatedSaListRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +76,14 @@ export interface FileRoutesById {
   '/_authenticated/hr': typeof AuthenticatedHrRoute
   '/_authenticated/sa': typeof AuthenticatedSaRoute
   '/_authenticated/sa-history': typeof AuthenticatedSaHistoryRoute
+  '/_authenticated/sa-list': typeof AuthenticatedSaListRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/reset-password' | '/hr' | '/sa' | '/sa-history'
+  fullPaths:
+    '/' | '/reset-password' | '/hr' | '/sa' | '/sa-history' | '/sa-list'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/reset-password' | '/hr' | '/sa' | '/sa-history'
+  to: '/' | '/reset-password' | '/hr' | '/sa' | '/sa-history' | '/sa-list'
   id:
     | '__root__'
     | '/'
@@ -82,6 +92,7 @@ export interface FileRouteTypes {
     | '/_authenticated/hr'
     | '/_authenticated/sa'
     | '/_authenticated/sa-history'
+    | '/_authenticated/sa-list'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -134,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSaHistoryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/sa-list': {
+      id: '/_authenticated/sa-list'
+      path: '/sa-list'
+      fullPath: '/sa-list'
+      preLoaderRoute: typeof AuthenticatedSaListRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -141,12 +159,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHrRoute: typeof AuthenticatedHrRoute
   AuthenticatedSaRoute: typeof AuthenticatedSaRoute
   AuthenticatedSaHistoryRoute: typeof AuthenticatedSaHistoryRoute
+  AuthenticatedSaListRoute: typeof AuthenticatedSaListRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHrRoute: AuthenticatedHrRoute,
   AuthenticatedSaRoute: AuthenticatedSaRoute,
   AuthenticatedSaHistoryRoute: AuthenticatedSaHistoryRoute,
+  AuthenticatedSaListRoute: AuthenticatedSaListRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
