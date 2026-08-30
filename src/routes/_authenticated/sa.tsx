@@ -303,15 +303,38 @@ function SAModule() {
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        <div
+          className={`flex flex-wrap items-center gap-3 rounded-md border px-4 py-3 text-sm font-semibold ${online ? "border-border bg-card/80" : "border-destructive/40 bg-destructive/10 text-destructive"}`}
+        >
+          {online ? <Wifi className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
+          <span>
+            {online
+              ? "Online — records are sent to HR immediately."
+              : "Offline mode — keep recording; everything is saved on this device."}
+          </span>
+          {pendingCount > 0 && (
+            <span className="rounded bg-secondary px-2 py-0.5 text-xs font-bold text-secondary-foreground">
+              {pendingCount} record{pendingCount === 1 ? "" : "s"} waiting to sync
+            </span>
+          )}
+          {pendingCount > 0 && online && (
+            <Button size="sm" variant="outline" disabled={syncing} onClick={() => void syncQueue()}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Sync now"}
+            </Button>
+          )}
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
             <CardDescription>
               Fill in the rows you observed, then submit. Your account ID and an exact timestamp are
-              attached automatically.
+              attached automatically. Works without internet — unsent batches are submitted
+              automatically once you reconnect.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label className="font-bold uppercase tracking-wide">Select Department:</Label>
