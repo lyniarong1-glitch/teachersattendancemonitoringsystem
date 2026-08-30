@@ -517,9 +517,12 @@ function SAModule() {
               >
                 <Send className="mr-2 h-4 w-4" />
                 {submit.isPending
-                  ? "Submitting…"
-                  : `Submit ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
+                  ? online
+                    ? "Submitting…"
+                    : "Saving offline…"
+                  : `${online ? "Submit" : "Save Offline"} ${readyRows.length || ""} Record${readyRows.length === 1 ? "" : "s"}`}
               </Button>
+
               <span className="text-sm font-medium text-muted-foreground">
                 {readyRows.length} of {teachers.length} teacher
                 {teachers.length === 1 ? "" : "s"} checked — all checked rows (including Absent) are
