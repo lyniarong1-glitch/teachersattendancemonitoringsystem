@@ -83,34 +83,87 @@ const EMPTY_ROW: RowState = {
 
 type Teacher = { id: string; full_name: string; department_id: string };
 
+async function pushBatch(batch: { records: OfflineRecord[]; notification: OfflineNotification }) {
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .insert(batch.records)
+    .select("id");
+  if (error) throw error;
+  const saved = data?.length ?? 0;
+  if (saved !== batch.records.length) {
+    throw new Error(
+      `Submission mismatch: ${batch.records.length} records checked but ${saved} saved. Please review and resubmit.`,
+    );
+  }
+  const { error: notifyError } = await supabase
+    .from("submission_notifications")
+    .insert(batch.notification);
+  if (notifyError) throw notifyError;
+  return saved;
+}
+
 function SAModule() {
   const { user, role, fullName } = useSession();
   const queryClient = useQueryClient();
+  const online = useOnlineStatus();
   const [departmentId, setDepartmentId] = useState("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [pending, setPending] = useState<PendingBatch[]>([]);
+  const [syncing, setSyncing] = useState(false);
 
   const setRow = (id: string, patch: Partial<RowState>) =>
     setRows((r) => ({ ...r, [id]: { ...EMPTY_ROW, ...r[id], ...patch } }));
 
+  // Restore any unfinished sheet + queued submissions saved on this device.
+  useEffect(() => {
+    const draft = loadDraft<Record<string, RowState>>();
+    if (draft && Object.keys(draft).length > 0) setRows(draft);
+    setPending(loadQueue());
+  }, []);
+
+  useEffect(() => {
+    saveDraft(rows);
+  }, [rows]);
+
+  const cached = typeof window !== "undefined" ? loadRoster() : null;
+
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
+    networkMode: "always",
+    initialData: cached?.departments,
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name").order("name");
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase.from("departments").select("id, name").order("name");
+        if (error) throw error;
+        saveRoster({ departments: data });
+        return data;
+      } catch (e) {
+        const fallback = loadRoster()?.departments;
+        if (fallback?.length) return fallback;
+        throw e;
+      }
     },
   });
 
   const { data: teachers = [] } = useQuery({
     queryKey: ["teachers-all"],
+    networkMode: "always",
+    initialData: cached?.teachers,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teachers")
-        .select("id, full_name, department_id")
-        .order("full_name");
-      if (error) throw error;
-      return data as Teacher[];
+      try {
+        const { data, error } = await supabase
+          .from("teachers")
+          .select("id, full_name, department_id")
+          .order("full_name");
+        if (error) throw error;
+        saveRoster({ teachers: data });
+        return data as Teacher[];
+      } catch (e) {
+        const fallback = loadRoster()?.teachers;
+        if (fallback?.length) return fallback as Teacher[];
+        throw e;
+      }
     },
   });
 
@@ -134,13 +187,47 @@ function SAModule() {
     [teachers, rows],
   );
 
+  const syncQueue = useCallback(
+    async (silent = false) => {
+      const queue = loadQueue();
+      if (queue.length === 0 || !isOnline()) {
+        setPending(queue);
+        return;
+      }
+      setSyncing(true);
+      let sent = 0;
+      for (const batch of queue) {
+        try {
+          const saved = await pushBatch(batch);
+          removeFromQueue(batch.id);
+          sent += saved;
+        } catch (e) {
+          if (!silent) toast.error((e as Error).message);
+          break;
+        }
+      }
+      setPending(loadQueue());
+      setSyncing(false);
+      if (sent > 0) {
+        void queryClient.invalidateQueries({ queryKey: ["my-records"] });
+        toast.success(`${sent} offline record${sent === 1 ? "" : "s"} synced to HR`);
+      }
+    },
+    [queryClient],
+  );
+
+  // Auto-sync whenever the connection comes back.
+  useEffect(() => {
+    if (online) void syncQueue(true);
+  }, [online, syncQueue]);
+
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
       const selected = readyRows;
       if (selected.length === 0) throw new Error("No attendance status has been checked yet");
       const stamp = localSubmissionStamp();
-      const payload = selected.map((t) => {
+      const records: OfflineRecord[] = selected.map((t) => {
         const r = rows[t.id]!;
         return {
           ...stamp,
@@ -154,38 +241,52 @@ function SAModule() {
           remarks: r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
         };
       });
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .insert(payload)
-        .select("id");
-      if (error) throw error;
-      const saved = data?.length ?? 0;
-      if (saved !== payload.length) {
-        throw new Error(
-          `Submission mismatch: ${payload.length} records checked but ${saved} saved. Please review and resubmit.`,
-        );
-      }
       const usedDepartments = Array.from(new Set(selected.map((t) => t.department_id)));
       const singleDept = usedDepartments.length === 1 ? usedDepartments[0]! : null;
-      const { error: notifyError } = await supabase.from("submission_notifications").insert({
+      const notification: OfflineNotification = {
         submitted_by: user.id,
         submitted_by_name: fullName,
         department_id: singleDept,
         department_name: singleDept
           ? (departments.find((d) => d.id === singleDept)?.name ?? null)
           : `${usedDepartments.length} departments`,
-        record_count: saved,
-      });
-      if (notifyError) throw notifyError;
-      return saved;
+        record_count: records.length,
+      };
+
+      if (!isOnline()) {
+        enqueueBatch({ records, notification });
+        setPending(loadQueue());
+        return { count: records.length, queued: true };
+      }
+
+      try {
+        const saved = await pushBatch({ records, notification });
+        return { count: saved, queued: false };
+      } catch (e) {
+        // Connection dropped mid-submit — keep the exact batch for later.
+        if (!isOnline()) {
+          enqueueBatch({ records, notification });
+          setPending(loadQueue());
+          return { count: records.length, queued: true };
+        }
+        throw e;
+      }
     },
-    onSuccess: (count) => {
+    onSuccess: ({ count, queued }) => {
       setRows({});
+      clearDraft();
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted to HR`);
+      toast.success(
+        queued
+          ? `${count} record${count === 1 ? "" : "s"} saved offline — they will be sent to HR automatically once you're back online`
+          : `${count} attendance record${count === 1 ? "" : "s"} submitted to HR`,
+      );
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const pendingCount = pending.reduce((n, b) => n + b.records.length, 0);
+
 
   if (role && role !== "student_assistant") {
     return (
