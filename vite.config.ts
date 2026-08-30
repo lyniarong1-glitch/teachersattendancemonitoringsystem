@@ -5,6 +5,7 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   tanstackStart: {
@@ -12,4 +13,50 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    plugins: [
+      VitePWA({
+        strategies: "generateSW",
+        registerType: "autoUpdate",
+        injectRegister: null,
+        filename: "sw.js",
+        devOptions: { enabled: false },
+        manifest: {
+          name: "Teachers Attendance Monitoring System",
+          short_name: "TAMS",
+          description:
+            "Record faculty attendance offline and submit it to HR when back online.",
+          theme_color: "#3f5d4a",
+          background_color: "#eef2ea",
+          display: "standalone",
+          start_url: "/",
+          icons: [
+            { src: "/favicon.png", sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: "/favicon.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          ],
+        },
+        workbox: {
+          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }: { request: Request }) => request.mode === "navigate",
+              handler: "NetworkFirst",
+              options: { cacheName: "tams-pages", networkTimeoutSeconds: 5 },
+            },
+            {
+              urlPattern: ({ url, request }: { url: URL; request: Request }) =>
+                url.origin === self.location.origin &&
+                ["style", "script", "image", "font"].includes(request.destination),
+              handler: "CacheFirst",
+              options: {
+                cacheName: "tams-assets",
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
+          ],
+        },
+      }),
+    ],
+  },
 });
+
