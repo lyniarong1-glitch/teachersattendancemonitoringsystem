@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Send } from "lucide-react";
+import { CloudOff, RefreshCw, Search, Send, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,21 @@ import { Input } from "@/components/ui/input";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  clearDraft,
+  enqueueBatch,
+  isOnline,
+  loadDraft,
+  loadQueue,
+  loadRoster,
+  removeFromQueue,
+  saveDraft,
+  saveRoster,
+  type OfflineNotification,
+  type OfflineRecord,
+  type PendingBatch,
+} from "@/lib/offline-attendance";
+
 
 import {
   Select,
