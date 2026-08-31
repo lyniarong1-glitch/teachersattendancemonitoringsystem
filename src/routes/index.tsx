@@ -98,7 +98,15 @@ function AuthPage() {
     if (loading || !user) return;
     if (role === "hr") navigate({ to: "/hr", replace: true });
     else if (role === "student_assistant") navigate({ to: "/sa", replace: true });
+    else {
+      // Signed in but no role yet — an HR access request is still awaiting approval.
+      void supabase.auth.signOut();
+      toast.info("Your HR access request is still awaiting approval from an HR officer.", {
+        duration: 8000,
+      });
+    }
   }, [loading, user, role, navigate]);
+
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
