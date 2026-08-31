@@ -147,23 +147,58 @@ function AuthPage() {
       mobile_number: isSA ? String(form.get("mobile_number") ?? "").trim() || null : null,
     };
 
-    const [{ error: profileError }, { error: roleError }] = await Promise.all([
-      supabase.from("profiles").insert(profile),
-      supabase
-        .from("user_roles")
-        .insert({ user_id: data.user.id, role: selectedRole as "hr" | "student_assistant" }),
-    ]);
-    setBusy(false);
-
-    if (profileError || roleError) {
-      toast.error(profileError?.message ?? roleError?.message ?? "Could not save profile");
+    const { error: profileError } = await supabase.from("profiles").insert(profile);
+    if (profileError) {
+      setBusy(false);
+      toast.error(profileError.message);
       return;
     }
-    toast.success("Account created");
-    await refresh();
-    navigate({ to: selectedRole === "hr" ? "/hr" : "/sa", replace: true });
 
+    if (isSA) {
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: data.user.id, role: "student_assistant" });
+      setBusy(false);
+      if (roleError) {
+        toast.error(roleError.message);
+        return;
+      }
+      toast.success("Account created");
+      await refresh();
+      navigate({ to: "/sa", replace: true });
+      return;
+    }
+
+    // HR access is privileged — self-granting is not allowed. The very first HR
+    // account bootstraps the system; everyone else waits for an existing HR to approve.
+    const { error: bootstrapError } = await supabase
+      .from("user_roles")
+      .insert({ user_id: data.user.id, role: "hr" });
+
+    if (!bootstrapError) {
+      setBusy(false);
+      toast.success("HR account created");
+      await refresh();
+      navigate({ to: "/hr", replace: true });
+      return;
+    }
+
+    const { error: requestError } = await supabase.from("hr_access_requests").insert({
+      user_id: data.user.id,
+      full_name: profile.full_name,
+      email,
+      status: "pending",
+    });
+    await supabase.auth.signOut();
+    setBusy(false);
+    toast[requestError ? "error" : "success"](
+      requestError
+        ? requestError.message
+        : "HR access request submitted. An existing HR officer must approve your account before you can sign in.",
+      { duration: 8000 },
+    );
   }
+
 
   return (
     <main className="campus-bg min-h-screen">
