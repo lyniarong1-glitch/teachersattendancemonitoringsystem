@@ -22,10 +22,15 @@ export function useSession() {
     }
     const [{ data: roleRow }, { data: profile }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", nextUser.id).maybeSingle(),
-      supabase.from("profiles").select("full_name, is_active").eq("id", nextUser.id).maybeSingle(),
+      supabase.from("profiles").select("full_name, is_active, approval_status").eq("id", nextUser.id).maybeSingle(),
     ]);
     if (!activeRef.current) return;
-    if (profile && profile.is_active === false) {
+    const blocked =
+      (profile && profile.is_active === false) ||
+      (profile && profile.approval_status && profile.approval_status !== "approved");
+    if (blocked) {
+      const pending = profile?.approval_status === "pending";
+      const rejected = profile?.approval_status === "rejected";
       await supabase.auth.signOut();
       if (!activeRef.current) return;
       setUser(null);
@@ -34,13 +39,20 @@ export function useSession() {
       setLoading(false);
       if (typeof window !== "undefined") {
         const { toast } = await import("sonner");
-        toast.error("This account has been deactivated by HR. Please contact the HR office.");
+        toast.error(
+          pending
+            ? "Your account is waiting for HR approval. Please try again once it has been approved."
+            : rejected
+              ? "Your account registration was rejected by HR. Please contact the HR office."
+              : "This account has been deactivated by HR. Please contact the HR office.",
+        );
       }
       return;
     }
     setRole((roleRow?.role as AppRole) ?? null);
     setFullName(profile?.full_name ?? nextUser.email ?? "");
     setLoading(false);
+
   }, []);
 
   const refresh = useCallback(async () => {
