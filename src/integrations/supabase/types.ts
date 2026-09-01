@@ -147,6 +147,9 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
           barangay: string | null
           birthdate: string | null
           city: string | null
@@ -171,6 +174,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           barangay?: string | null
           birthdate?: string | null
           city?: string | null
@@ -195,6 +201,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           barangay?: string | null
           birthdate?: string | null
           city?: string | null
