@@ -23,6 +23,11 @@ export function formatTime(value?: string | null) {
 
 export const ROOMS = [
   "A-201", "A-202",
+  "Annex B 101",
+  "Annex B 102",
+  "Annex B 103",
+  "Annex B 104",
+  "Annex B 105",
   "F-102", "F-103", "F-301", "F-302", "F-303",
   "Mini Hotel",
   "Chemistry Laboratory",
