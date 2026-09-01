@@ -121,6 +121,10 @@ function AuthPage() {
       toast.error("Please select your role");
       return;
     }
+    if (selectedRole === "student_assistant" && !signupSchedule) {
+      toast.error("Please select your class schedule");
+      return;
+    }
     setBusy(true);
     const email = String(form.get("email")).trim();
     const { data, error } = await supabase.auth.signUp({
@@ -159,9 +163,11 @@ function AuthPage() {
       toast.error(profileError?.message ?? roleError?.message ?? "Could not save profile");
       return;
     }
-    toast.success("Account created");
+    await supabase.auth.signOut();
+    toast.success(
+      "Account created — your registration was sent to HR for approval. You can sign in once it is approved.",
+    );
     await refresh();
-    navigate({ to: selectedRole === "hr" ? "/hr" : "/sa", replace: true });
 
   }
 
@@ -219,17 +225,21 @@ function AuthPage() {
 
               <TabsContent value="signup">
                 <form className="space-y-4 pt-4" onSubmit={handleSignUp}>
+                  <p className="text-xs font-bold text-muted-foreground">
+                    All fields marked <span className="text-destructive">*</span> are required. New
+                    accounts need HR approval before the first sign in.
+                  </p>
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name</Label>
+                    <Label htmlFor="full_name">Full Name <span className="text-destructive">*</span></Label>
                     <Input id="full_name" name="full_name" required maxLength={120} />
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="birthdate">Date of Birth</Label>
-                      <Input id="birthdate" name="birthdate" type="date" />
+                      <Label htmlFor="birthdate">Date of Birth <span className="text-destructive">*</span></Label>
+                      <Input id="birthdate" name="birthdate" type="date" required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="role">Role</Label>
+                      <Label htmlFor="role">Role <span className="text-destructive">*</span></Label>
                       <Select name="role" value={signupRole} onValueChange={setSignupRole}>
                         <SelectTrigger id="role">
                           <SelectValue placeholder="Select role" />
@@ -245,11 +255,11 @@ function AuthPage() {
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="id_number">Student ID Number</Label>
+                          <Label htmlFor="id_number">Student ID Number <span className="text-destructive">*</span></Label>
                           <Input id="id_number" name="id_number" required maxLength={40} />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="course_year">Course &amp; Year</Label>
+                          <Label htmlFor="course_year">Course &amp; Year <span className="text-destructive">*</span></Label>
                           <Input
                             id="course_year"
                             name="course_year"
@@ -261,7 +271,7 @@ function AuthPage() {
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="class_schedule">Class Schedule</Label>
+                          <Label htmlFor="class_schedule">Class Schedule <span className="text-destructive">*</span></Label>
                           <Select value={signupSchedule} onValueChange={setSignupSchedule}>
                             <SelectTrigger id="class_schedule">
                               <SelectValue placeholder="Select session" />
@@ -274,7 +284,7 @@ function AuthPage() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="mobile_number">Active Mobile Number</Label>
+                          <Label htmlFor="mobile_number">Active Mobile Number <span className="text-destructive">*</span></Label>
                           <Input
                             id="mobile_number"
                             name="mobile_number"
@@ -287,15 +297,15 @@ function AuthPage() {
                     </>
                   )}
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea id="address" name="address" rows={2} maxLength={300} />
+                    <Label htmlFor="address">Address <span className="text-destructive">*</span></Label>
+                    <Textarea id="address" name="address" rows={2} maxLength={300} required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
+                    <Label htmlFor="signup-email">Email <span className="text-destructive">*</span></Label>
                     <Input id="signup-email" name="email" type="email" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
+                    <Label htmlFor="signup-password">Password <span className="text-destructive">*</span></Label>
                     <PasswordInput
                       id="signup-password"
                       name="password"
