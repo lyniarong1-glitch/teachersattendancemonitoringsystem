@@ -111,9 +111,45 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_access_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          email: string
+          full_name: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          email: string
+          full_name: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
           barangay: string | null
           birthdate: string | null
           city: string | null
@@ -138,6 +174,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           barangay?: string | null
           birthdate?: string | null
           city?: string | null
@@ -162,6 +201,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           barangay?: string | null
           birthdate?: string | null
           city?: string | null
@@ -279,6 +321,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_hr_request: { Args: { _request_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
