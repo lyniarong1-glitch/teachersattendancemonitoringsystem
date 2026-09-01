@@ -277,16 +277,19 @@ export type Database = {
           department_id: string
           full_name: string
           id: string
+          is_active: boolean
         }
         Insert: {
           department_id: string
           full_name: string
           id?: string
+          is_active?: boolean
         }
         Update: {
           department_id?: string
           full_name?: string
           id?: string
+          is_active?: boolean
         }
         Relationships: [
           {
