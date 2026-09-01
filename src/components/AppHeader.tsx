@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { History, Home, LogOut, Menu, UserRound, Users } from "lucide-react";
+import { History, Home, LogOut, Menu, ShieldCheck, UserRound, Users } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import dccSeal from "@/assets/dcc-seal.jpg.asset.json";
 import { supabase } from "@/integrations/supabase/client";
