@@ -65,7 +65,7 @@ const EMPTY_ROW: RowState = {
   other_remark: "",
 };
 
-type Teacher = { id: string; full_name: string; department_id: string };
+type Teacher = { id: string; full_name: string; department_id: string; is_active: boolean };
 
 function SAModule() {
   const { user, role, fullName } = useSession();
@@ -91,7 +91,8 @@ function SAModule() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teachers")
-        .select("id, full_name, department_id")
+        .select("id, full_name, department_id, is_active")
+        .eq("is_active", true)
         .order("full_name");
       if (error) throw error;
       return data as Teacher[];
