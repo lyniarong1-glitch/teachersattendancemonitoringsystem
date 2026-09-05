@@ -262,14 +262,26 @@ function HRModule() {
     },
   });
 
+  const recordedDays = useMemo(
+    () =>
+      [...new Set(records.map((r) => r.date_submitted))].map((k) => {
+        const [y, m, d] = k.split("-").map(Number);
+        return new Date(y!, (m ?? 1) - 1, d ?? 1);
+      }),
+    [records],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const day = dateFilter ? dateKey(dateFilter) : null;
     return records.filter(
       (r) =>
         (department === "all" || r.department_id === department) &&
+        (!day || r.date_submitted === day) &&
         (!q || (r.teachers?.full_name ?? "").toLowerCase().includes(q)),
     );
-  }, [records, department, search]);
+  }, [records, department, search, dateFilter]);
+
 
   const groups = useMemo(() => {
     // One section per submission batch (date + exact time + submitter) so a new
