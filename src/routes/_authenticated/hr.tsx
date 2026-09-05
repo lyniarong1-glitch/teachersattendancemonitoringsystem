@@ -488,7 +488,50 @@ function HRModule() {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start font-normal">
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {dateFilter ? dateKey(dateFilter) : "All dates"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFilter}
+                        onSelect={(d) => {
+                          setDateFilter(d);
+                          setPage(0);
+                        }}
+                        modifiers={{ recorded: recordedDays }}
+                        modifiersClassNames={{
+                          recorded: "font-extrabold text-primary underline underline-offset-4",
+                        }}
+                      />
+                      <p className="px-3 pb-3 text-xs text-muted-foreground">
+                        Underlined dates have attendance records.
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                  {dateFilter && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setDateFilter(undefined);
+                        setPage(0);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
+
 
             {isLoading && <p className="text-muted-foreground">Loading records…</p>}
             {!isLoading && groups.length === 0 && (
