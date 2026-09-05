@@ -1,0 +1,2 @@
+CREATE POLICY "hr deletes records" ON public.attendance_records FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'hr'::app_role));
+CREATE POLICY "hr deletes notifications" ON public.submission_notifications FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'hr'::app_role));
