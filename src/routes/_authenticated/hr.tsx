@@ -54,6 +54,13 @@ import {
   formatTime,
   formatTimeExact,
 } from "@/lib/attendance-constants";
+import {
+  TeacherAttendanceHistory,
+  type HistoryRecord,
+} from "@/components/TeacherAttendanceHistory";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hr")({
   head: () => ({
@@ -94,6 +101,10 @@ type RecordRow = {
 
 const DATES_PER_PAGE = 3;
 
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function statusVariant(s: RecordRow["attendance_status"]) {
   return s === "Present" ? "default" : s === "Late" ? "secondary" : "destructive";
 }
@@ -103,6 +114,7 @@ function HRModule() {
   const queryClient = useQueryClient();
   const [department, setDepartment] = useState("all");
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [editing, setEditing] = useState<RecordRow | null>(null);
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
   const [saView, setSaView] = useState<string | null>(null);
@@ -255,14 +267,26 @@ function HRModule() {
     },
   });
 
+  const recordedDays = useMemo(
+    () =>
+      [...new Set(records.map((r) => r.date_submitted))].map((k) => {
+        const [y, m, d] = k.split("-").map(Number);
+        return new Date(y!, (m ?? 1) - 1, d ?? 1);
+      }),
+    [records],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const day = dateFilter ? dateKey(dateFilter) : null;
     return records.filter(
       (r) =>
         (department === "all" || r.department_id === department) &&
+        (!day || r.date_submitted === day) &&
         (!q || (r.teachers?.full_name ?? "").toLowerCase().includes(q)),
     );
-  }, [records, department, search]);
+  }, [records, department, search, dateFilter]);
+
 
   const groups = useMemo(() => {
     // One section per submission batch (date + exact time + submitter) so a new
@@ -481,7 +505,50 @@ function HRModule() {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start font-normal">
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {dateFilter ? dateKey(dateFilter) : "All dates"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFilter}
+                        onSelect={(d) => {
+                          setDateFilter(d);
+                          setPage(0);
+                        }}
+                        modifiers={{ recorded: recordedDays }}
+                        modifiersClassNames={{
+                          recorded: "font-extrabold text-primary underline underline-offset-4",
+                        }}
+                      />
+                      <p className="px-3 pb-3 text-xs text-muted-foreground">
+                        Underlined dates have attendance records.
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                  {dateFilter && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setDateFilter(undefined);
+                        setPage(0);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
+
 
             {isLoading && <p className="text-muted-foreground">Loading records…</p>}
             {!isLoading && groups.length === 0 && (
@@ -627,70 +694,18 @@ function HRModule() {
       </main>
 
       <Dialog open={!!teacherView} onOpenChange={(o) => !o && setTeacherView(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{teacherView?.name} — Attendance History</DialogTitle>
             <DialogDescription>
-              {teacherRecords.length} record{teacherRecords.length === 1 ? "" : "s"}, most recent
-              first.
+              Complete stored history for this teacher — summary, calendar and paged records.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-auto rounded-md border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time Submitted</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Time Out</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Remarks</TableHead>
-                  <TableHead>Submitted By</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teacherRecords.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground">
-                      No records for this teacher yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {teacherRecords.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.date_submitted}</TableCell>
-                    <TableCell>{formatTimeExact(r.time_submitted)}</TableCell>
-                    <TableCell>{r.departments?.name}</TableCell>
-                    <TableCell>{r.room_assignment}</TableCell>
-                    <TableCell>{formatTime(r.time_arrival)}</TableCell>
-                    <TableCell>{formatTime(r.time_out)}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(r.attendance_status)}>
-                        {r.attendance_status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {r.remarks || "None"}
-                      {r.last_edited_at && (
-                        <div className="text-xs text-muted-foreground">
-                          edited {new Date(r.last_edited_at).toLocaleString()}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{r.profiles?.full_name ?? "—"}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
-                        <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <TeacherAttendanceHistory
+            key={teacherView?.id}
+            records={teacherRecords as unknown as HistoryRecord[]}
+            onEdit={(r) => setEditing(r as unknown as RecordRow)}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setTeacherView(null)}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Master Table
@@ -698,6 +713,7 @@ function HRModule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <Dialog
         open={!!batchView}
