@@ -54,6 +54,13 @@ import {
   formatTime,
   formatTimeExact,
 } from "@/lib/attendance-constants";
+import {
+  TeacherAttendanceHistory,
+  type HistoryRecord,
+} from "@/components/TeacherAttendanceHistory";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hr")({
   head: () => ({
