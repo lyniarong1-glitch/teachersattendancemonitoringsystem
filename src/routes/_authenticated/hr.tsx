@@ -60,7 +60,8 @@ import {
 } from "@/components/TeacherAttendanceHistory";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, X } from "lucide-react";
+import { CalendarDays, Trash2, X } from "lucide-react";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const Route = createFileRoute("/_authenticated/hr")({
   head: () => ({
