@@ -110,6 +110,7 @@ function HRModule() {
   const queryClient = useQueryClient();
   const [department, setDepartment] = useState("all");
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [editing, setEditing] = useState<RecordRow | null>(null);
   const [teacherView, setTeacherView] = useState<{ id: string; name: string } | null>(null);
   const [saView, setSaView] = useState<string | null>(null);
