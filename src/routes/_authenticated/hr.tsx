@@ -128,6 +128,8 @@ function HRModule() {
     submitted_at: string;
   } | null>(null);
   const [page, setPage] = useState(0);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   // Batch keys (date|time|submitter) HR has already reviewed from a notification.
   const [reviewedKeys, setReviewedKeys] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -325,6 +327,33 @@ function HRModule() {
       );
   }, [records, teacherView]);
 
+  const deleteAll = useMutation({
+    mutationFn: async (password: string) => {
+      if (!user?.email) throw new Error("Not signed in");
+      if (!password) throw new Error("Please enter your password");
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      });
+      if (authError) throw new Error("Incorrect password. Records were not deleted.");
+      const { error } = await supabase
+        .from("attendance_records")
+        .delete()
+        .not("id", "is", null);
+      if (error) throw error;
+      await supabase.from("submission_notifications").delete().not("id", "is", null);
+    },
+    onSuccess: () => {
+      setDeleteAllOpen(false);
+      setDeletePassword("");
+      setPage(0);
+      void queryClient.invalidateQueries({ queryKey: ["all-records"] });
+      void queryClient.invalidateQueries();
+      toast.success("All attendance records have been deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
       if (!user) throw new Error("Not signed in");
@@ -464,12 +493,25 @@ function HRModule() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="no-print">
-            <CardTitle>Master Attendance Table</CardTitle>
-            <CardDescription>
-              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length}{" "}
-              submission batch{groups.length === 1 ? "" : "es"} — newest first, never merged
-            </CardDescription>
+          <CardHeader className="no-print flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle>Master Attendance Table</CardTitle>
+              <CardDescription>
+                {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length}{" "}
+                submission batch{groups.length === 1 ? "" : "es"} — newest first, never merged
+              </CardDescription>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={records.length === 0}
+              onClick={() => {
+                setDeletePassword("");
+                setDeleteAllOpen(true);
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete All Records
+            </Button>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="no-print grid gap-4 sm:grid-cols-2 lg:max-w-xl">
@@ -956,6 +998,51 @@ function HRModule() {
               {update.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteAllOpen}
+        onOpenChange={(o) => {
+          setDeleteAllOpen(o);
+          if (!o) setDeletePassword("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete All Attendance Records</DialogTitle>
+            <DialogDescription>
+              This permanently removes all {records.length} attendance record
+              {records.length === 1 ? "" : "s"} and submission notifications. This cannot be
+              undone. Type your account password to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              deleteAll.mutate(deletePassword);
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="delete-all-password">Your Password</Label>
+              <PasswordInput
+                id="delete-all-password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeleteAllOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="destructive" disabled={deleteAll.isPending}>
+                {deleteAll.isPending ? "Deleting…" : "Confirm Delete All"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
