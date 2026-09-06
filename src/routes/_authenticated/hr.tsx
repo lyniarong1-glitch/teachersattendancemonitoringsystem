@@ -1000,6 +1000,51 @@ function HRModule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={deleteAllOpen}
+        onOpenChange={(o) => {
+          setDeleteAllOpen(o);
+          if (!o) setDeletePassword("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete All Attendance Records</DialogTitle>
+            <DialogDescription>
+              This permanently removes all {records.length} attendance record
+              {records.length === 1 ? "" : "s"} and submission notifications. This cannot be
+              undone. Type your account password to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              deleteAll.mutate(deletePassword);
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="delete-all-password">Your Password</Label>
+              <PasswordInput
+                id="delete-all-password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeleteAllOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="destructive" disabled={deleteAll.isPending}>
+                {deleteAll.isPending ? "Deleting…" : "Confirm Delete All"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
