@@ -85,6 +85,9 @@ function SAModule() {
   const [departmentId, setDepartmentId] = useState("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [online, setOnline] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
   const setRow = (id: string, patch: Partial<RowState>) =>
     setRows((r) => ({ ...r, [id]: { ...EMPTY_ROW, ...r[id], ...patch } }));
@@ -92,24 +95,97 @@ function SAModule() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name").order("name");
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase.from("departments").select("id, name").order("name");
+        if (error) throw error;
+        cacheRoster({ departments: data });
+        return data;
+      } catch (e) {
+        const cached = getCachedRoster().departments;
+        if (cached.length) return cached;
+        throw e;
+      }
     },
   });
 
   const { data: teachers = [] } = useQuery({
     queryKey: ["teachers-all"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teachers")
-        .select("id, full_name, department_id, is_active")
-        .eq("is_active", true)
-        .order("full_name");
-      if (error) throw error;
-      return data as Teacher[];
+      try {
+        const { data, error } = await supabase
+          .from("teachers")
+          .select("id, full_name, department_id, is_active")
+          .eq("is_active", true)
+          .order("full_name");
+        if (error) throw error;
+        cacheRoster({ teachers: data as Teacher[] });
+        return data as Teacher[];
+      } catch (e) {
+        const cached = getCachedRoster().teachers;
+        if (cached.length) return cached as Teacher[];
+        throw e;
+      }
     },
   });
+
+  const syncPending = useCallback(
+    async (silent = false) => {
+      const batches = getPendingBatches();
+      if (batches.length === 0) {
+        setPendingCount(0);
+        return;
+      }
+      if (!isOnline()) {
+        if (!silent) toast.error("Still offline — saved records will send once you reconnect.");
+        return;
+      }
+      setSyncing(true);
+      let sent = 0;
+      try {
+        for (const batch of batches) {
+          const { data, error } = await supabase
+            .from("attendance_records")
+            .insert(batch.records)
+            .select("id");
+          if (error) throw error;
+          const { error: notifyError } = await supabase
+            .from("submission_notifications")
+            .insert({ ...batch.notification, record_count: data?.length ?? batch.records.length });
+          if (notifyError) throw notifyError;
+          removeBatch(batch.id);
+          sent += data?.length ?? batch.records.length;
+        }
+        if (sent > 0) {
+          void queryClient.invalidateQueries({ queryKey: ["my-records"] });
+          toast.success(`${sent} offline record${sent === 1 ? "" : "s"} sent to HR`);
+        }
+      } catch (e) {
+        if (!silent) toast.error((e as Error).message || "Could not send saved records yet.");
+      } finally {
+        setSyncing(false);
+        setPendingCount(pendingRecordCount());
+      }
+    },
+    [queryClient],
+  );
+
+  useEffect(() => {
+    setOnline(isOnline());
+    setPendingCount(pendingRecordCount());
+    const goOnline = () => {
+      setOnline(true);
+      void syncPending(true);
+    };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    if (isOnline()) void syncPending(true);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, [syncPending]);
+
 
   const groups = useMemo(() => {
     const q = search.trim().toLowerCase();
