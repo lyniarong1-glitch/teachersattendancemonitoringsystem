@@ -493,12 +493,25 @@ function HRModule() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="no-print">
-            <CardTitle>Master Attendance Table</CardTitle>
-            <CardDescription>
-              {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length}{" "}
-              submission batch{groups.length === 1 ? "" : "es"} — newest first, never merged
-            </CardDescription>
+          <CardHeader className="no-print flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle>Master Attendance Table</CardTitle>
+              <CardDescription>
+                {filtered.length} record{filtered.length === 1 ? "" : "s"} in {groups.length}{" "}
+                submission batch{groups.length === 1 ? "" : "es"} — newest first, never merged
+              </CardDescription>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={records.length === 0}
+              onClick={() => {
+                setDeletePassword("");
+                setDeleteAllOpen(true);
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete All Records
+            </Button>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="no-print grid gap-4 sm:grid-cols-2 lg:max-w-xl">
