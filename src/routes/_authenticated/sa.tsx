@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Send } from "lucide-react";
+import { CloudOff, RefreshCw, Search, Send, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -27,6 +27,18 @@ import {
   TIME_SLOTS,
   localSubmissionStamp,
 } from "@/lib/attendance-constants";
+import {
+  cacheRoster,
+  getCachedRoster,
+  getPendingBatches,
+  isOnline,
+  pendingRecordCount,
+  queueBatch,
+  removeBatch,
+  type PendingNotification,
+  type PendingRecord,
+} from "@/lib/offline-attendance";
+
 
 export const Route = createFileRoute("/_authenticated/sa")({
   head: () => ({
