@@ -213,7 +213,7 @@ function SAModule() {
       const selected = readyRows;
       if (selected.length === 0) throw new Error("No attendance status has been checked yet");
       const stamp = localSubmissionStamp();
-      const payload = selected.map((t) => {
+      const payload: PendingRecord[] = selected.map((t) => {
         const r = rows[t.id]!;
         return {
           ...stamp,
@@ -227,38 +227,61 @@ function SAModule() {
           remarks: r.remarks === "Others" ? r.other_remark.trim() || "Others" : r.remarks,
         };
       });
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .insert(payload)
-        .select("id");
-      if (error) throw error;
-      const saved = data?.length ?? 0;
-      if (saved !== payload.length) {
-        throw new Error(
-          `Submission mismatch: ${payload.length} records checked but ${saved} saved. Please review and resubmit.`,
-        );
-      }
       const usedDepartments = Array.from(new Set(selected.map((t) => t.department_id)));
       const singleDept = usedDepartments.length === 1 ? usedDepartments[0]! : null;
-      const { error: notifyError } = await supabase.from("submission_notifications").insert({
+      const notification: PendingNotification = {
         submitted_by: user.id,
         submitted_by_name: fullName,
         department_id: singleDept,
         department_name: singleDept
           ? (departments.find((d) => d.id === singleDept)?.name ?? null)
           : `${usedDepartments.length} departments`,
-        record_count: saved,
-      });
-      if (notifyError) throw notifyError;
-      return saved;
+        record_count: payload.length,
+      };
+
+      const saveOffline = () => {
+        queueBatch({ records: payload, notification });
+        setPendingCount(pendingRecordCount());
+        return { saved: payload.length, offline: true as const };
+      };
+
+      if (!isOnline()) return saveOffline();
+
+      try {
+        const { data, error } = await supabase
+          .from("attendance_records")
+          .insert(payload)
+          .select("id");
+        if (error) throw error;
+        const saved = data?.length ?? 0;
+        if (saved !== payload.length) {
+          throw new Error(
+            `Submission mismatch: ${payload.length} records checked but ${saved} saved. Please review and resubmit.`,
+          );
+        }
+        const { error: notifyError } = await supabase
+          .from("submission_notifications")
+          .insert({ ...notification, record_count: saved });
+        if (notifyError) throw notifyError;
+        return { saved, offline: false as const };
+      } catch (e) {
+        // Network failure mid-submission — keep the work safe on the device.
+        if (!isOnline()) return saveOffline();
+        throw e as Error;
+      }
     },
-    onSuccess: (count) => {
+    onSuccess: ({ saved, offline }) => {
       setRows({});
       void queryClient.invalidateQueries({ queryKey: ["my-records"] });
-      toast.success(`${count} attendance record${count === 1 ? "" : "s"} submitted to HR`);
+      toast.success(
+        offline
+          ? `${saved} record${saved === 1 ? "" : "s"} saved on this device — they will be sent to HR automatically once you are back online.`
+          : `${saved} attendance record${saved === 1 ? "" : "s"} submitted to HR`,
+      );
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (role && role !== "student_assistant") {
     return (
