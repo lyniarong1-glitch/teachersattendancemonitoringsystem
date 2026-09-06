@@ -128,6 +128,8 @@ function HRModule() {
     submitted_at: string;
   } | null>(null);
   const [page, setPage] = useState(0);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   // Batch keys (date|time|submitter) HR has already reviewed from a notification.
   const [reviewedKeys, setReviewedKeys] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -324,6 +326,33 @@ function HRModule() {
         ),
       );
   }, [records, teacherView]);
+
+  const deleteAll = useMutation({
+    mutationFn: async (password: string) => {
+      if (!user?.email) throw new Error("Not signed in");
+      if (!password) throw new Error("Please enter your password");
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      });
+      if (authError) throw new Error("Incorrect password. Records were not deleted.");
+      const { error } = await supabase
+        .from("attendance_records")
+        .delete()
+        .not("id", "is", null);
+      if (error) throw error;
+      await supabase.from("submission_notifications").delete().not("id", "is", null);
+    },
+    onSuccess: () => {
+      setDeleteAllOpen(false);
+      setDeletePassword("");
+      setPage(0);
+      void queryClient.invalidateQueries({ queryKey: ["all-records"] });
+      void queryClient.invalidateQueries();
+      toast.success("All attendance records have been deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const update = useMutation({
     mutationFn: async (patch: RecordRow) => {
