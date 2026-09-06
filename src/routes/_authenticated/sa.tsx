@@ -297,7 +297,38 @@ function SAModule() {
   return (
     <div className="min-h-screen campus-bg">
       <AppHeader name={fullName} role="Student Assistant" userId={user?.id} isSA />
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+      <main className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-8 lg:px-8">
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
+            online
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-accent bg-accent/25 text-accent-foreground"
+          }`}
+        >
+          <span className="flex items-center gap-2 font-semibold">
+            {online ? <Wifi className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
+            {online
+              ? "Connected — records are sent to HR right away."
+              : "No internet — you can keep recording. Everything is saved on this device."}
+          </span>
+          {pendingCount > 0 && (
+            <span className="flex items-center gap-3">
+              <span className="font-semibold">
+                {pendingCount} record{pendingCount === 1 ? "" : "s"} waiting to be sent
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={syncing || !online}
+                onClick={() => void syncPending()}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Sending…" : "Send now"}
+              </Button>
+            </span>
+          )}
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Record Faculty Attendance</CardTitle>
